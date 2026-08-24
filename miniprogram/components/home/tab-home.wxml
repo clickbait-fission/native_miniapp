@@ -1,2 +1,26 @@
-<!--components/home/tab-home.wxml-->
-<text>components/home/tab-home.wxml</text>
+<scroll-view
+        class="container"
+        style="{{dynamicStyle}}"
+        type="custom"
+        scroll-y
+        bind:scroll="onScroll">
+    <view class="root">
+        <view class="top-space"/>
+        <view wx:for="{{shownMedias}}" wx:key="id" class="card">
+            <media-brief media="{{item}}"/>
+        </view>
+        <view class="bottom-space"/>
+    </view>
+    <!--    <list-builder list="{{medias}}" child-height="200">-->
+    <!--        fuck-->
+    <!--    </list-builder>-->
+    <!--    <list-builder list="{{medias}}"-->
+    <!--                  child-height="{{cardHeight}}"-->
+    <!--                  bind:itembuild="onCardBuild"-->
+    <!--                  bind:itemdipose="onCardDisposed">-->
+    <!--        <view slot:item class="card">-->
+    <!--            Card is '{{item}}' of {{medias}}-->
+    <!--            &lt;!&ndash;            <media-brief media="{{item}}" />&ndash;&gt;-->
+    <!--        </view>-->
+    <!--    </list-builder>-->
+</scroll-view>

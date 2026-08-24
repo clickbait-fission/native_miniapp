@@ -1,26 +1,3 @@
-//#region node_modules/ts-mixer/dist/types/types.d.ts
-/**
- * A rigorous type alias for a class.
- */
-type Class<CtorArgs extends any[] = any[], InstanceType = {}, StaticType = {}, IsAbstract = false> = (abstract new (...args: any[]) => InstanceType) & StaticType;
-//#endregion
-//#region src/networks/network.d.ts
-type HttpMethod = 'OPTIONS' | 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'TRACE' | 'CONNECT';
-interface Network {
-  invokeHttp(request: NetworkRequest): Promise<NetworkResponse>;
-}
-type NetworkRequest = {
-  method: HttpMethod;
-  uri: string;
-  headers?: Record<string, string>;
-  requestBody?: Uint8Array<ArrayBuffer>;
-};
-type NetworkResponse = {
-  status: number;
-  headers: Record<string, any>;
-  body: Uint8Array;
-};
-//#endregion
 //#region node_modules/@bufbuild/protobuf/dist/esm/wire/binary-encoding.d.ts
 /**
  * Protobuf binary format wire types.
@@ -306,8 +283,22 @@ interface CommonResponseData {
   status: ResponseStatus;
   message: string;
 }
+interface MediaAsset {
+  id: number;
+  url: string;
+  cover: string;
+  title: string;
+  tags: string[];
+  ownerId: number;
+  ownerNickname?: string | undefined;
+  ownerAvatar?: string | undefined;
+  viewCount: number;
+  isFavorite: boolean;
+  banned: boolean;
+}
 declare const CommonApiData: MessageFns$3<CommonApiData>;
 declare const CommonResponseData: MessageFns$3<CommonResponseData>;
+declare const MediaAsset: MessageFns$3<MediaAsset>;
 type Builtin$3 = Date | Function | Uint8Array | string | number | boolean | undefined;
 type DeepPartial$3<T> = T extends Builtin$3 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$3<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$3<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$3<T[K]>; } : Partial<T>;
 type KeysOfUnion$3<T> = T extends T ? keyof T : never;
@@ -320,6 +311,29 @@ interface MessageFns$3<T> {
   create<I extends Exact$3<DeepPartial$3<T>, I>>(base?: I): T;
   fromPartial<I extends Exact$3<DeepPartial$3<T>, I>>(object: I): T;
 }
+//#endregion
+//#region node_modules/ts-mixer/dist/types/types.d.ts
+/**
+ * A rigorous type alias for a class.
+ */
+type Class<CtorArgs extends any[] = any[], InstanceType = {}, StaticType = {}, IsAbstract = false> = (abstract new (...args: any[]) => InstanceType) & StaticType;
+//#endregion
+//#region src/networks/network.d.ts
+type HttpMethod = 'OPTIONS' | 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'TRACE' | 'CONNECT';
+interface Network {
+  invokeHttp(request: NetworkRequest): Promise<NetworkResponse>;
+}
+type NetworkRequest = {
+  method: HttpMethod;
+  uri: string;
+  headers?: Record<string, string>;
+  requestBody?: Uint8Array<ArrayBuffer>;
+};
+type NetworkResponse = {
+  status: number;
+  headers: Record<string, any>;
+  body: Uint8Array;
+};
 //#endregion
 //#region src/models/client/log/video.d.ts
 interface VideoView {
@@ -512,6 +526,8 @@ declare class ApiAuth extends BaseApi {
 }
 //#endregion
 //#region src/index.d.ts
+type Media = MediaAsset;
+declare const Media: MessageFns$3<MediaAsset>;
 declare const Api_base: Class<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt>;
 declare class Api extends Api_base {
   constructor(appId: number, base: string, network: Network);
@@ -521,5 +537,5 @@ declare class Api extends Api_base {
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api };
+export { Api, Media };
 //# sourceMappingURL=index.d.ts.map

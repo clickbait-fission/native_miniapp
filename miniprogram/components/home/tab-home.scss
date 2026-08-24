@@ -1,1 +1,21 @@
-/* components/home/tab-home.wxss */
+.container {
+  width: 100%;
+  height: 100%;
+}
+
+.root {
+  height: var(--root-height);
+
+  &>.top-space {
+    height: var(--top-space);
+  }
+
+  &>.bottom-space {
+    height: var(--bottom-space);
+  }
+
+  &>.card {
+    width: 100%;
+    height: var(--card-height);
+  }
+}

@@ -1689,6 +1689,155 @@ const CommonResponseData = {
 		return message;
 	}
 };
+function createBaseMediaAsset() {
+	return {
+		id: 0,
+		url: "",
+		cover: "",
+		title: "",
+		tags: [],
+		ownerId: 0,
+		ownerNickname: void 0,
+		ownerAvatar: void 0,
+		viewCount: 0,
+		isFavorite: false,
+		banned: false
+	};
+}
+const MediaAsset = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.id !== 0) writer.uint32(8).int64(message.id);
+		if (message.url !== "") writer.uint32(26).string(message.url);
+		if (message.cover !== "") writer.uint32(34).string(message.cover);
+		if (message.title !== "") writer.uint32(42).string(message.title);
+		for (const v of message.tags) writer.uint32(50).string(v);
+		if (message.ownerId !== 0) writer.uint32(56).int64(message.ownerId);
+		if (message.ownerNickname !== void 0) writer.uint32(66).string(message.ownerNickname);
+		if (message.ownerAvatar !== void 0) writer.uint32(74).string(message.ownerAvatar);
+		if (message.viewCount !== 0) writer.uint32(88).int64(message.viewCount);
+		if (message.isFavorite !== false) writer.uint32(96).bool(message.isFavorite);
+		if (message.banned !== false) writer.uint32(104).bool(message.banned);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseMediaAsset();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.id = longToNumber$2(reader.int64());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.url = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.cover = reader.string();
+						continue;
+					case 5:
+						if (tag !== 42) break;
+						message.title = reader.string();
+						continue;
+					case 6:
+						if (tag !== 50) break;
+						message.tags.push(reader.string());
+						continue;
+					case 7:
+						if (tag !== 56) break;
+						message.ownerId = longToNumber$2(reader.int64());
+						continue;
+					case 8:
+						if (tag !== 66) break;
+						message.ownerNickname = reader.string();
+						continue;
+					case 9:
+						if (tag !== 74) break;
+						message.ownerAvatar = reader.string();
+						continue;
+					case 11:
+						if (tag !== 88) break;
+						message.viewCount = longToNumber$2(reader.int64());
+						continue;
+					case 12:
+						if (tag !== 96) break;
+						message.isFavorite = reader.bool();
+						continue;
+					case 13:
+						if (tag !== 104) break;
+						message.banned = reader.bool();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			id: isSet$5(object.id) ? globalThis.Number(object.id) : 0,
+			url: isSet$5(object.url) ? globalThis.String(object.url) : "",
+			cover: isSet$5(object.cover) ? globalThis.String(object.cover) : "",
+			title: isSet$5(object.title) ? globalThis.String(object.title) : "",
+			tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e) => globalThis.String(e)) : [],
+			ownerId: isSet$5(object.ownerId) ? globalThis.Number(object.ownerId) : 0,
+			ownerNickname: isSet$5(object.ownerNickname) ? globalThis.String(object.ownerNickname) : void 0,
+			ownerAvatar: isSet$5(object.ownerAvatar) ? globalThis.String(object.ownerAvatar) : void 0,
+			viewCount: isSet$5(object.viewCount) ? globalThis.Number(object.viewCount) : 0,
+			isFavorite: isSet$5(object.isFavorite) ? globalThis.Boolean(object.isFavorite) : false,
+			banned: isSet$5(object.banned) ? globalThis.Boolean(object.banned) : false
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.url !== "") obj.url = message.url;
+		if (message.cover !== "") obj.cover = message.cover;
+		if (message.title !== "") obj.title = message.title;
+		if (message.tags?.length) obj.tags = message.tags;
+		if (message.ownerId !== 0) obj.ownerId = Math.round(message.ownerId);
+		if (message.ownerNickname !== void 0) obj.ownerNickname = message.ownerNickname;
+		if (message.ownerAvatar !== void 0) obj.ownerAvatar = message.ownerAvatar;
+		if (message.viewCount !== 0) obj.viewCount = Math.round(message.viewCount);
+		if (message.isFavorite !== false) obj.isFavorite = message.isFavorite;
+		if (message.banned !== false) obj.banned = message.banned;
+		return obj;
+	},
+	create(base) {
+		return MediaAsset.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseMediaAsset();
+		message.id = object.id ?? 0;
+		message.url = object.url ?? "";
+		message.cover = object.cover ?? "";
+		message.title = object.title ?? "";
+		message.tags = object.tags?.map((e) => e) || [];
+		message.ownerId = object.ownerId ?? 0;
+		message.ownerNickname = object.ownerNickname ?? void 0;
+		message.ownerAvatar = object.ownerAvatar ?? void 0;
+		message.viewCount = object.viewCount ?? 0;
+		message.isFavorite = object.isFavorite ?? false;
+		message.banned = object.banned ?? false;
+		return message;
+	}
+};
+function longToNumber$2(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
 function isSet$5(value) {
 	return value !== null && value !== void 0;
 }
@@ -1731,24 +1880,15 @@ var BaseSessionManagement = class {
 	onPageChange(page) {
 		const pages = getCurrentPages();
 		if (pages.length == 0) return;
-		let path;
+		const current = pages[pages.length - 1];
+		if (current == null) return;
+		const path = page?.path ?? current.path;
+		const params = page?.params ?? current.options;
 		let trimParams = {};
-		if (page == null) {
-			const current = pages[pages.length - 1];
-			if (current == null) return;
-			path = current.path;
-			for (const k in current.options) {
-				const v = current.options[k];
-				if (v == null) continue;
-				trimParams[k] = v;
-			}
-		} else {
-			path = page.path;
-			if (page?.params != null) for (const k in page.params) {
-				const v = page.params[k];
-				if (v == null) continue;
-				trimParams[k] = v;
-			}
+		for (const k in params) {
+			const v = params[k];
+			if (v == null) continue;
+			trimParams[k] = v;
 		}
 		if (this.cachedPath == path) return;
 		this.cachedPath = path;
@@ -3186,6 +3326,7 @@ var ApiAuth = class extends BaseApi {
 //#endregion
 //#region src/index.ts
 let textEncodingConfigured = false;
+const Media = MediaAsset;
 var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt) {
 	constructor(appId, base, network) {
 		if (!textEncodingConfigured) Api.configureCustomUtf8();
@@ -3207,6 +3348,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api };
+export { Api, Media };
 
 //# sourceMappingURL=index.js.map
