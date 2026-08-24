@@ -21,81 +21,81 @@ SOFTWARE.
 ***************************************************************************** */
 
 declare namespace WechatMiniprogram.Behavior {
-  /** 实际使用中该值类型为 `string`。`TypeSignature` 仅用作类型推导，运行时无此类型对应的实际值 */
-  type Identifier<
-    TData extends DataOption = {},
-    TProperty extends PropertyOption = {},
-    TMethod extends MethodOption = {},
-    TBehavior extends BehaviorOption = [],
-  > = string & TypeSignature<TData, TProperty, TMethod, TBehavior>;
-  type Instance<
-    TData extends DataOption,
-    TProperty extends PropertyOption,
-    TMethod extends MethodOption,
-    TBehavior extends BehaviorOption,
-    TCustomInstanceProperty extends IAnyObject = Record<string, never>,
-  > = Component.Instance<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>;
-  type TrivialInstance = Instance<IAnyObject, IAnyObject, IAnyObject, Component.IEmptyArray>;
-  type TrivialOption = Options<IAnyObject, IAnyObject, IAnyObject, Component.IEmptyArray>;
-  type Options<
-    TData extends DataOption,
-    TProperty extends PropertyOption,
-    TMethod extends MethodOption,
-    TBehavior extends BehaviorOption,
-    TCustomInstanceProperty extends IAnyObject = Record<string, never>,
-  > = Partial<Data<TData>> &
-    Partial<Property<TProperty>> &
-    Partial<Method<TMethod>> &
-    Partial<Behavior<TBehavior>> &
-    Partial<OtherOption> &
-    Partial<Lifetimes> &
-    ThisType<Instance<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>>;
-  interface Constructor {
-    <
-      TData extends DataOption,
-      TProperty extends PropertyOption,
-      TMethod extends MethodOption,
-      TBehavior extends BehaviorOption,
-      TCustomInstanceProperty extends IAnyObject = Record<string, never>,
-    >(
-      options: Options<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>,
-    ): Identifier<TData, TProperty, TMethod, TBehavior>;
-    (): GlassEasel.Behavior.Builder;
-    trait: GlassEasel.TraitBehavior.Constructor;
-  }
+    /** 实际使用中该值类型为 `string`。`TypeSignature` 仅用作类型推导，运行时无此类型对应的实际值 */
+    type Identifier<
+        TData extends DataOption = {},
+        TProperty extends PropertyOption = {},
+        TMethod extends MethodOption = {},
+        TBehavior extends BehaviorOption = []
+    > = string & TypeSignature<TData, TProperty, TMethod, TBehavior>
+    type Instance<
+        TData extends DataOption,
+        TProperty extends PropertyOption,
+        TMethod extends MethodOption,
+        TBehavior extends BehaviorOption,
+        TCustomInstanceProperty extends IAnyObject = Record<string, never>
+    > = Component.Instance<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>
+    type TrivialInstance = Instance<IAnyObject, IAnyObject, IAnyObject, Component.IEmptyArray>
+    type TrivialOption = Options<IAnyObject, IAnyObject, IAnyObject, Component.IEmptyArray>
+    type Options<
+        TData extends DataOption,
+        TProperty extends PropertyOption,
+        TMethod extends MethodOption,
+        TBehavior extends BehaviorOption,
+        TCustomInstanceProperty extends IAnyObject = Record<string, never>
+    > = Partial<Data<TData>> &
+        Partial<Property<TProperty>> &
+        Partial<Method<TMethod>> &
+        Partial<Behavior<TBehavior>> &
+        Partial<OtherOption> &
+        Partial<Lifetimes> &
+        ThisType<Instance<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>>
+    interface Constructor {
+        <
+            TData extends DataOption,
+            TProperty extends PropertyOption,
+            TMethod extends MethodOption,
+            TBehavior extends BehaviorOption,
+            TCustomInstanceProperty extends IAnyObject = Record<string, never>
+        >(
+            options: Options<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty>
+        ): Identifier<TData, TProperty, TMethod, TBehavior>
+        (): GlassEasel.Behavior.Builder
+        trait: GlassEasel.TraitBehavior.Constructor
+    }
 
-  type DataOption = Component.DataOption;
-  type PropertyOption = Component.PropertyOption;
-  type MethodOption = Component.MethodOption;
-  type BehaviorOption = Component.BehaviorOption;
-  type Data<D extends DataOption> = Component.Data<D>;
-  type Property<P extends PropertyOption> = Component.Property<P>;
-  type Method<M extends MethodOption> = Component.Method<M>;
-  type Behavior<B extends BehaviorOption> = Component.Behavior<B>;
+    type DataOption = Component.DataOption
+    type PropertyOption = Component.PropertyOption
+    type MethodOption = Component.MethodOption
+    type BehaviorOption = Component.BehaviorOption
+    type Data<D extends DataOption> = Component.Data<D>
+    type Property<P extends PropertyOption> = Component.Property<P>
+    type Method<M extends MethodOption> = Component.Method<M>
+    type Behavior<B extends BehaviorOption> = Component.Behavior<B>
 
-  type DefinitionFilter = Component.DefinitionFilter;
-  type Lifetimes = Component.Lifetimes;
-  type OtherOption = Omit<Component.OtherOption, 'options'>;
+    type DefinitionFilter = Component.DefinitionFilter
+    type Lifetimes = Component.Lifetimes
+    type OtherOption = Omit<Component.OtherOption, 'options'>
 
-  /** 用于辅助识别 behavior 字段类型的虚拟字段 */
-  class TypeSignature<
-    TData extends DataOption,
-    TProperty extends PropertyOption,
-    TMethod extends MethodOption,
-    TBehavior extends BehaviorOption,
-  > {
-    protected readonly _$behaviorFieldTypes?: TypeSignatureFields<TData, TProperty, TMethod, TBehavior>;
-  }
-  type TypeSignatureFields<
-    TData extends DataOption,
-    TProperty extends PropertyOption,
-    TMethod extends MethodOption,
-    TBehavior extends BehaviorOption,
-  > = {
-    data: Component.FilterUnknownType<TData> & Component.MixinData<TBehavior>;
-    properties: Component.FilterUnknownType<TProperty> & Component.MixinProperties<TBehavior, true>;
-    methods: Component.FilterUnknownType<TMethod> & Component.MixinMethods<TBehavior>;
-  };
+    /** 用于辅助识别 behavior 字段类型的虚拟字段 */
+    class TypeSignature<
+        TData extends DataOption,
+        TProperty extends PropertyOption,
+        TMethod extends MethodOption,
+        TBehavior extends BehaviorOption,
+    > {
+        protected readonly _$behaviorFieldTypes?: TypeSignatureFields<TData, TProperty, TMethod, TBehavior>
+    }
+    type TypeSignatureFields<
+        TData extends DataOption,
+        TProperty extends PropertyOption,
+        TMethod extends MethodOption,
+        TBehavior extends BehaviorOption,
+    > = {
+        data: Component.FilterUnknownType<TData> & Component.MixinData<TBehavior>
+        properties: Component.FilterUnknownType<TProperty> & Component.MixinProperties<TBehavior, true>
+        methods: Component.FilterUnknownType<TMethod> & Component.MixinMethods<TBehavior>
+    }
 }
 /** 注册一个 `behavior`，接受一个 `Object` 类型的参数。*/
-declare let Behavior: WechatMiniprogram.Behavior.Constructor;
+declare let Behavior: WechatMiniprogram.Behavior.Constructor
