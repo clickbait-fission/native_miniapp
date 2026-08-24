@@ -1,9 +1,15 @@
 <!--index.wxml-->
 <view class="container" style="{{vars}}">
-    <view class="content">
-        <tab-home visible="{{currentTab === 'home'}}"/>
-        <tab-article wx:if="{{currentTab === 'article'}}"/>
-        <tab-settings wx:if="{{currentTab === 'settings'}}"/>
+    <view class="content-container">
+        <view class="content" style="{{homeTabStyle}}">
+            <tab-home/>
+        </view>
+        <view wx:if="{{currentTab === 'article'}}" class="content">
+            <tab-article/>
+        </view>
+        <view wx:if="{{currentTab === 'settings'}}" class="content">
+            <tab-settings/>
+        </view>
     </view>
     <view class="tab">
         <view wx:for="{{tabs}}" wx:key="tab" class="item" bind:tap="onTapTab" data-tab="{{item.tab}}">

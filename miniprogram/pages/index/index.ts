@@ -24,6 +24,7 @@ Component({
     data: {
         _pageViewReported: false,
         currentTab: 'home' satisfies Tab,
+        homeTabStyle: '',
         tabs: [
             {
                 tab: 'home',
@@ -79,6 +80,7 @@ Component({
             }
             this.setData({
                 currentTab: tab,
+                homeTabStyle: tab === 'home' ? '' : 'display: none;',
             });
             this.reportTabView();
         },
