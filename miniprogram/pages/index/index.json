@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "tab-home": "/components/home/tab-home",
+    "tab-article": "/components/home/tab-article",
+    "tab-settings": "/components/home/tab-settings"
+  }
+}

@@ -1,0 +1,3212 @@
+//#region \0rolldown/runtime.js
+var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
+//#endregion
+//#region src/compatible/utf8.ts
+var LegacyUtf8TextEncoding = class {
+	constructor() {}
+	checkUtf8() {
+		return true;
+	}
+	encodeUtf8(text) {
+		const bin = unescape(encodeURIComponent(text)).split("").map((val) => val.charCodeAt(0));
+		return Uint8Array.from(bin);
+	}
+	decodeUtf8(bytes) {
+		return decodeURIComponent(escape(String.fromCharCode(...bytes)));
+	}
+};
+var Utf8TextEncoding = class {
+	checkUtf8(text) {
+		const size = text.length;
+		for (let i = 0; i < size; i++) {
+			const codePoint = text.charCodeAt(i);
+			if (isASCII(codePoint)) continue;
+			if (inRange(codePoint, 128, 1114111)) continue;
+			return false;
+		}
+		return true;
+	}
+	encodeUtf8(text) {
+		const bytes = [];
+		for (let i = 0; i < text.length; ++i) encodeCodePoint(text.charCodeAt(i), bytes);
+		return Uint8Array.from(bytes);
+	}
+	decodeUtf8(bytes) {
+		let codePoints = [];
+		const decoder = new CodePointDecoder();
+		for (const byte of bytes) {
+			const codePoint = decoder.decode(byte);
+			if (codePoint != null) codePoints.push(codePoint);
+		}
+		decoder.end();
+		return String.fromCodePoint(...codePoints);
+	}
+};
+function isASCII(value) {
+	return value >= 0 && value <= 127;
+}
+function inRange(value, min, max) {
+	return value >= min && value <= max;
+}
+function encodeCodePoint(codePoint, output) {
+	if (isASCII(codePoint)) {
+		output.push(codePoint);
+		return;
+	}
+	let appendCount;
+	let appendOffset;
+	if (inRange(codePoint, 128, 2047)) {
+		appendCount = 1;
+		appendOffset = 192;
+	} else if (inRange(codePoint, 2048, 65535)) {
+		appendCount = 2;
+		appendOffset = 224;
+	} else if (inRange(codePoint, 65536, 1114111)) {
+		appendCount = 3;
+		appendOffset = 240;
+	} else throw new Error("Could encode code point of text in utf-8");
+	output.push((codePoint >> 6 * appendCount) + appendOffset);
+	while (appendCount > 0) {
+		appendCount--;
+		const temp = codePoint >> 6 * appendCount;
+		output.push(128 | temp & 63);
+	}
+}
+var CodePointDecoder = class {
+	constructor() {
+		this.codePoint = 0;
+		this.bytesSeen = 0;
+		this.bytesNeeded = 0;
+		this.lowerBoundary = 128;
+		this.upperBoundary = 191;
+	}
+	decode(byte) {
+		if (this.bytesNeeded === 0) {
+			if (inRange(byte, 0, 127)) return byte;
+			else if (inRange(byte, 194, 223)) {
+				this.bytesNeeded = 1;
+				this.codePoint = byte & 31;
+			} else if (inRange(byte, 224, 239)) {
+				if (byte === 224) this.lowerBoundary = 160;
+				if (byte === 237) this.upperBoundary = 159;
+				this.bytesNeeded = 2;
+				this.codePoint = byte & 15;
+			} else if (inRange(byte, 240, 244)) {
+				if (byte === 240) this.lowerBoundary = 144;
+				if (byte === 244) this.upperBoundary = 143;
+				this.bytesNeeded = 3;
+				this.codePoint = byte & 7;
+			} else throw new Error(`Unexpected head byte ${byte}`);
+			return null;
+		}
+		if (!inRange(byte, this.lowerBoundary, this.upperBoundary)) {
+			this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
+			this.lowerBoundary = 128;
+			this.upperBoundary = 191;
+			throw new Error(`Unexpected byte mid ${byte} (expected ${this.lowerBoundary}, ${this.upperBoundary})`);
+		}
+		this.lowerBoundary = 128;
+		this.upperBoundary = 191;
+		this.codePoint = this.codePoint << 6 | byte & 63;
+		this.bytesSeen += 1;
+		if (this.bytesSeen !== this.bytesNeeded) return null;
+		const codePoint = this.codePoint;
+		this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
+		return codePoint;
+	}
+	end() {
+		if (this.bytesNeeded !== 0) {
+			this.bytesNeeded = 0;
+			throw new Error("Unexpected eof");
+		}
+	}
+};
+//#endregion
+//#region node_modules/@bufbuild/protobuf/dist/esm/wire/varint.js
+/**
+* Read a 64 bit varint as two JS numbers.
+*
+* Stores the low and high words on the reader.
+*
+* Copyright 2008 Google Inc.  All rights reserved.
+*
+* See https://github.com/protocolbuffers/protobuf/blob/8a71927d74a4ce34efe2d8769fda198f52d20d12/js/experimental/runtime/kernel/buffer_decoder.js#L175
+*/
+function varint64read() {
+	const buf = this.buf;
+	let pos = this.pos;
+	let lo = 0;
+	let hi = 0;
+	for (let shift = 0; shift < 28; shift += 7) {
+		const b = buf[pos++];
+		lo |= (b & 127) << shift;
+		if ((b & 128) == 0) {
+			this.pos = pos;
+			this.assertBounds();
+			this.varint64Lo = lo;
+			this.varint64Hi = hi;
+			return;
+		}
+	}
+	const middleByte = buf[pos++];
+	lo |= (middleByte & 15) << 28;
+	hi = (middleByte & 112) >> 4;
+	if ((middleByte & 128) == 0) {
+		this.pos = pos;
+		this.assertBounds();
+		this.varint64Lo = lo;
+		this.varint64Hi = hi;
+		return;
+	}
+	for (let shift = 3; shift <= 31; shift += 7) {
+		const b = buf[pos++];
+		hi |= (b & 127) << shift;
+		if ((b & 128) == 0) {
+			this.pos = pos;
+			this.assertBounds();
+			this.varint64Lo = lo;
+			this.varint64Hi = hi;
+			return;
+		}
+	}
+	throw new Error("invalid varint");
+}
+const TWO_PWR_32_DBL = 4294967296;
+/**
+* Parse decimal string of 64 bit integer value as two JS numbers.
+*
+* Copyright 2008 Google Inc.  All rights reserved.
+*
+* See https://github.com/protocolbuffers/protobuf-javascript/blob/a428c58273abad07c66071d9753bc4d1289de426/experimental/runtime/int64.js#L10
+*/
+function int64FromString(dec) {
+	const minus = dec[0] === "-";
+	if (minus) dec = dec.slice(1);
+	const base = 1e6;
+	let lowBits = 0;
+	let highBits = 0;
+	function add1e6digit(begin, end) {
+		const digit1e6 = Number(dec.slice(begin, end));
+		highBits *= base;
+		lowBits = lowBits * base + digit1e6;
+		if (lowBits >= TWO_PWR_32_DBL) {
+			highBits = highBits + (lowBits / TWO_PWR_32_DBL | 0);
+			lowBits = lowBits % TWO_PWR_32_DBL;
+		}
+	}
+	add1e6digit(-24, -18);
+	add1e6digit(-18, -12);
+	add1e6digit(-12, -6);
+	add1e6digit(-6);
+	return minus ? negate(lowBits, highBits) : newBits(lowBits, highBits);
+}
+/**
+* Losslessly converts a 64-bit signed integer in 32:32 split representation
+* into a decimal string.
+*
+* Copyright 2008 Google Inc.  All rights reserved.
+*
+* See https://github.com/protocolbuffers/protobuf-javascript/blob/a428c58273abad07c66071d9753bc4d1289de426/experimental/runtime/int64.js#L10
+*/
+function int64ToString(lo, hi) {
+	let bits = newBits(lo, hi);
+	const negative = bits.hi & 2147483648;
+	if (negative) bits = negate(bits.lo, bits.hi);
+	const result = uInt64ToString(bits.lo, bits.hi);
+	return negative ? "-" + result : result;
+}
+/**
+* Losslessly converts a 64-bit unsigned integer in 32:32 split representation
+* into a decimal string.
+*
+* Copyright 2008 Google Inc.  All rights reserved.
+*
+* See https://github.com/protocolbuffers/protobuf-javascript/blob/a428c58273abad07c66071d9753bc4d1289de426/experimental/runtime/int64.js#L10
+*/
+function uInt64ToString(lo, hi) {
+	({lo, hi} = toUnsigned(lo, hi));
+	if (hi <= 2097151) return String(TWO_PWR_32_DBL * hi + lo);
+	const low = lo & 16777215;
+	const mid = (lo >>> 24 | hi << 8) & 16777215;
+	const high = hi >> 16 & 65535;
+	let digitA = low + mid * 6777216 + high * 6710656;
+	let digitB = mid + high * 8147497;
+	let digitC = high * 2;
+	const base = 1e7;
+	if (digitA >= base) {
+		digitB += Math.floor(digitA / base);
+		digitA %= base;
+	}
+	if (digitB >= base) {
+		digitC += Math.floor(digitB / base);
+		digitB %= base;
+	}
+	return digitC.toString() + decimalFrom1e7WithLeadingZeros(digitB) + decimalFrom1e7WithLeadingZeros(digitA);
+}
+function toUnsigned(lo, hi) {
+	return {
+		lo: lo >>> 0,
+		hi: hi >>> 0
+	};
+}
+function newBits(lo, hi) {
+	return {
+		lo: lo | 0,
+		hi: hi | 0
+	};
+}
+/**
+* Returns two's compliment negation of input.
+* @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Bitwise_Operators#Signed_32-bit_integers
+*/
+function negate(lowBits, highBits) {
+	highBits = ~highBits;
+	if (lowBits) lowBits = ~lowBits + 1;
+	else highBits += 1;
+	return newBits(lowBits, highBits);
+}
+/**
+* Returns decimal representation of digit1e7 with leading zeros.
+*/
+const decimalFrom1e7WithLeadingZeros = (digit1e7) => {
+	const partial = String(digit1e7);
+	return "0000000".slice(partial.length) + partial;
+};
+/**
+* Read an unsigned 32 bit varint.
+*
+* See https://github.com/protocolbuffers/protobuf/blob/8a71927d74a4ce34efe2d8769fda198f52d20d12/js/experimental/runtime/kernel/buffer_decoder.js#L220
+*/
+function varint32read() {
+	let b = this.buf[this.pos++];
+	if ((b & 128) === 0) {
+		this.assertBounds();
+		return b;
+	}
+	let result = b & 127;
+	b = this.buf[this.pos++];
+	result |= (b & 127) << 7;
+	if ((b & 128) === 0) {
+		this.assertBounds();
+		return result;
+	}
+	b = this.buf[this.pos++];
+	result |= (b & 127) << 14;
+	if ((b & 128) === 0) {
+		this.assertBounds();
+		return result;
+	}
+	b = this.buf[this.pos++];
+	result |= (b & 127) << 21;
+	if ((b & 128) === 0) {
+		this.assertBounds();
+		return result;
+	}
+	b = this.buf[this.pos++];
+	result |= (b & 15) << 28;
+	for (let readBytes = 5; (b & 128) !== 0 && readBytes < 10; readBytes++) b = this.buf[this.pos++];
+	if ((b & 128) !== 0) throw new Error("invalid varint");
+	this.assertBounds();
+	return result >>> 0;
+}
+//#endregion
+//#region node_modules/@bufbuild/protobuf/dist/esm/proto-int64.js
+/**
+* Int64Support for the current environment.
+*/
+const protoInt64 = /*@__PURE__*/ makeInt64Support();
+function makeInt64Support() {
+	const dv = /* @__PURE__ */ new DataView(/* @__PURE__ */ new ArrayBuffer(8));
+	if (typeof BigInt === "function" && typeof dv.getBigInt64 === "function" && typeof dv.getBigUint64 === "function" && typeof dv.setBigInt64 === "function" && typeof dv.setBigUint64 === "function" && (!!globalThis.Deno || !!globalThis.Bun || typeof process != "object" || typeof process.env != "object" || process.env.BUF_BIGINT_DISABLE !== "1")) {
+		const MIN = BigInt("-9223372036854775808");
+		const MAX = BigInt("9223372036854775807");
+		const UMIN = BigInt("0");
+		const UMAX = BigInt("18446744073709551615");
+		return {
+			zero: BigInt(0),
+			supported: true,
+			parse(value) {
+				const bi = typeof value == "bigint" ? value : BigInt(value);
+				if (bi > MAX || bi < MIN) throw new Error(`invalid int64: ${value}`);
+				return bi;
+			},
+			uParse(value) {
+				const bi = typeof value == "bigint" ? value : BigInt(value);
+				if (bi > UMAX || bi < UMIN) throw new Error(`invalid uint64: ${value}`);
+				return bi;
+			},
+			enc(value) {
+				dv.setBigInt64(0, this.parse(value), true);
+				return {
+					lo: dv.getInt32(0, true),
+					hi: dv.getInt32(4, true)
+				};
+			},
+			uEnc(value) {
+				dv.setBigInt64(0, this.uParse(value), true);
+				return {
+					lo: dv.getInt32(0, true),
+					hi: dv.getInt32(4, true)
+				};
+			},
+			dec(lo, hi) {
+				dv.setInt32(0, lo, true);
+				dv.setInt32(4, hi, true);
+				return dv.getBigInt64(0, true);
+			},
+			uDec(lo, hi) {
+				dv.setInt32(0, lo, true);
+				dv.setInt32(4, hi, true);
+				return dv.getBigUint64(0, true);
+			}
+		};
+	}
+	return {
+		zero: "0",
+		supported: false,
+		parse(value) {
+			if (typeof value != "string") value = value.toString();
+			assertInt64String(value);
+			return value;
+		},
+		uParse(value) {
+			if (typeof value != "string") value = value.toString();
+			assertUInt64String(value);
+			return value;
+		},
+		enc(value) {
+			if (typeof value != "string") value = value.toString();
+			assertInt64String(value);
+			return int64FromString(value);
+		},
+		uEnc(value) {
+			if (typeof value != "string") value = value.toString();
+			assertUInt64String(value);
+			return int64FromString(value);
+		},
+		dec(lo, hi) {
+			return int64ToString(lo, hi);
+		},
+		uDec(lo, hi) {
+			return uInt64ToString(lo, hi);
+		}
+	};
+}
+function assertInt64String(value) {
+	if (!/^-?[0-9]+$/.test(value)) throw new Error("invalid int64: " + value);
+}
+function assertUInt64String(value) {
+	if (!/^[0-9]+$/.test(value)) throw new Error("invalid uint64: " + value);
+}
+//#endregion
+//#region node_modules/@bufbuild/protobuf/dist/esm/wire/text-encoding.js
+const symbol = Symbol.for("@bufbuild/protobuf/text-encoding");
+/**
+* Protobuf-ES requires the Text Encoding API to convert UTF-8 from and to
+* binary. This WHATWG API is widely available, but it is not part of the
+* ECMAScript standard. On runtimes where it is not available, use this
+* function to provide your own implementation.
+*
+* Providing `encodeUtf8Into` is optional for backwards compatibility. If it
+* is omitted, we emulate it with a wrapper that calls `encodeUtf8`.
+*
+* Note that the Text Encoding API does not provide a way to validate UTF-8.
+* Our implementation uses String.prototype.isWellFormed, and falls back
+* to use encodeURIComponent().
+*/
+function configureTextEncoding(textEncoding) {
+	var _a;
+	globalThis[symbol] = Object.assign(Object.assign({}, textEncoding), { encodeUtf8Into: (_a = textEncoding.encodeUtf8Into) !== null && _a !== void 0 ? _a : emulateEncodeInto(textEncoding.encodeUtf8.bind(textEncoding)) });
+}
+function getTextEncoding() {
+	const globals = globalThis;
+	if (!globals[symbol]) {
+		const textEncoder = new globals.TextEncoder();
+		const textDecoder = new globals.TextDecoder();
+		let textDecoderStrict;
+		const config = {
+			encodeUtf8(text) {
+				return textEncoder.encode(text);
+			},
+			decodeUtf8(bytes, strict) {
+				if (strict) {
+					if (!textDecoderStrict) textDecoderStrict = new globals.TextDecoder("utf-8", { fatal: true });
+					return textDecoderStrict.decode(bytes);
+				}
+				return textDecoder.decode(bytes);
+			},
+			checkUtf8(text) {
+				try {
+					return true;
+				} catch (_) {
+					return false;
+				}
+			}
+		};
+		if (textEncoder.encodeInto) config.encodeUtf8Into = textEncoder.encodeInto.bind(textEncoder);
+		const nativeStringIsWellFormed = String.prototype.isWellFormed;
+		if (nativeStringIsWellFormed) config.checkUtf8 = (text) => {
+			return nativeStringIsWellFormed.call(text);
+		};
+		configureTextEncoding(config);
+	}
+	return globals[symbol];
+}
+/**
+* Simplistic polyfill for encodeUtf8Into.
+*
+* @private
+*/
+function emulateEncodeInto(encodeUtf8) {
+	return (text, dest) => {
+		const bytes = encodeUtf8(text);
+		dest.set(bytes);
+		return { written: bytes.byteLength };
+	};
+}
+//#endregion
+//#region node_modules/@bufbuild/protobuf/dist/esm/wire/binary-encoding.js
+/**
+* Protobuf binary format wire types.
+*
+* A wire type provides just enough information to find the length of the
+* following value.
+*
+* See https://developers.google.com/protocol-buffers/docs/encoding#structure
+*/
+var WireType;
+(function(WireType) {
+	/**
+	* Used for int32, int64, uint32, uint64, sint32, sint64, bool, enum
+	*/
+	WireType[WireType["Varint"] = 0] = "Varint";
+	/**
+	* Used for fixed64, sfixed64, double.
+	* Always 8 bytes with little-endian byte order.
+	*/
+	WireType[WireType["Bit64"] = 1] = "Bit64";
+	/**
+	* Used for string, bytes, embedded messages, packed repeated fields
+	*
+	* Only repeated numeric types (types which use the varint, 32-bit,
+	* or 64-bit wire types) can be packed. In proto3, such fields are
+	* packed by default.
+	*/
+	WireType[WireType["LengthDelimited"] = 2] = "LengthDelimited";
+	/**
+	* Start of a tag-delimited aggregate, such as a proto2 group, or a message
+	* in editions with message_encoding = DELIMITED.
+	*/
+	WireType[WireType["StartGroup"] = 3] = "StartGroup";
+	/**
+	* End of a tag-delimited aggregate.
+	*/
+	WireType[WireType["EndGroup"] = 4] = "EndGroup";
+	/**
+	* Used for fixed32, sfixed32, float.
+	* Always 4 bytes with little-endian byte order.
+	*/
+	WireType[WireType["Bit32"] = 5] = "Bit32";
+})(WireType || (WireType = {}));
+var BinaryWriter = class {
+	constructor(encodeUtf8) {
+		/**
+		* Previous fork positions (the write position at the time
+		* `fork()` was called).
+		*/
+		this.stackPos = [];
+		this.encodeUtf8Into = encodeUtf8 ? emulateEncodeInto(encodeUtf8) : getTextEncoding().encodeUtf8Into;
+		this.buffer = EMPTY_BUFFER;
+		this.viewCache = EMPTY_VIEW;
+		this.pos = 0;
+	}
+	ensureCapacity(size) {
+		const required = this.pos + size;
+		if (required > this.buffer.length) {
+			let newLen = this.buffer.length || INITIAL_SIZE;
+			while (newLen < required) newLen *= 2;
+			const newBuf = new Uint8Array(newLen);
+			if (this.pos > 0) newBuf.set(this.buffer);
+			this.buffer = newBuf;
+		}
+	}
+	/**
+	* The DataView over `buffer`, rebuilt only if the buffer has grown since it
+	* was last used.
+	*/
+	view() {
+		const bytes = this.buffer;
+		const view = this.viewCache;
+		if (view.byteLength === bytes.byteLength) return view;
+		const newView = new DataView(bytes.buffer);
+		this.viewCache = newView;
+		return newView;
+	}
+	/**
+	* Return all bytes written and reset this writer.
+	*/
+	finish() {
+		const result = this.buffer.slice(0, this.pos);
+		this.pos = 0;
+		this.stackPos = [];
+		return result;
+	}
+	/**
+	* Start a new fork for length-delimited data like a message
+	* or a packed repeated field.
+	*
+	* Must be joined later with `join()`.
+	*/
+	fork() {
+		this.stackPos.push(this.pos);
+		this.ensureCapacity(DEFAULT_LEN_PREFIX_SIZE);
+		this.buffer[this.pos++] = 0;
+		return this;
+	}
+	/**
+	* Join the last fork. Write its length and bytes, then
+	* return to the previous state.
+	*/
+	join() {
+		const forkPos = this.stackPos.pop();
+		if (forkPos === void 0) throw new Error("invalid state, fork stack empty");
+		const len = this.pos - forkPos - DEFAULT_LEN_PREFIX_SIZE;
+		const lenPrefixSize = varint32Size(len);
+		if (lenPrefixSize > DEFAULT_LEN_PREFIX_SIZE) {
+			this.ensureCapacity(lenPrefixSize - DEFAULT_LEN_PREFIX_SIZE);
+			this.buffer.copyWithin(forkPos + lenPrefixSize, forkPos + DEFAULT_LEN_PREFIX_SIZE, this.pos);
+		}
+		this.pos = forkPos;
+		this.uint32(len);
+		this.pos += len;
+		return this;
+	}
+	/**
+	* Writes a tag (field number and wire type).
+	*
+	* Equivalent to `uint32( (fieldNo << 3 | type) >>> 0 )`.
+	*
+	* Generated code should compute the tag ahead of time and call `uint32()`.
+	*/
+	tag(fieldNo, type) {
+		return this.uint32((fieldNo << 3 | type) >>> 0);
+	}
+	/**
+	* Write a chunk of raw bytes.
+	*/
+	raw(chunk) {
+		this.ensureCapacity(chunk.length);
+		this.buffer.set(chunk, this.pos);
+		this.pos += chunk.length;
+		return this;
+	}
+	/**
+	* Write a `uint32` value, an unsigned 32 bit varint.
+	*/
+	uint32(value) {
+		assertUInt32(value);
+		this.ensureCapacity(5);
+		if (value < 128) {
+			this.buffer[this.pos++] = value;
+			return this;
+		}
+		while (value > 127) {
+			this.buffer[this.pos++] = value & 127 | 128;
+			value >>>= 7;
+		}
+		this.buffer[this.pos++] = value;
+		return this;
+	}
+	/**
+	* Write a `int32` value, a signed 32 bit varint.
+	*/
+	int32(value) {
+		assertInt32(value);
+		if (value >= 0) return this.uint32(value);
+		this.ensureCapacity(10);
+		for (let i = 0; i < 9; i++) {
+			this.buffer[this.pos++] = value & 127 | 128;
+			value >>= 7;
+		}
+		this.buffer[this.pos++] = 1;
+		return this;
+	}
+	/**
+	* Write a `bool` value, a varint.
+	*/
+	bool(value) {
+		this.ensureCapacity(1);
+		this.buffer[this.pos++] = value ? 1 : 0;
+		return this;
+	}
+	/**
+	* Write a `bytes` value, length-delimited arbitrary data.
+	*/
+	bytes(value) {
+		this.uint32(value.byteLength);
+		return this.raw(value);
+	}
+	/**
+	* Write a `string` value, length-delimited data converted to UTF-8 text.
+	*/
+	string(value) {
+		if (typeof value !== "string") value = String(value);
+		const len = value.length;
+		if (len <= ASCII_MAX_LENGTH) {
+			this.ensureCapacity(len + 1);
+			const ascii = this.buffer;
+			let pos = this.pos;
+			ascii[pos++] = len;
+			let i = 0;
+			for (; i < len; i++) {
+				const code = value.charCodeAt(i);
+				if (code > 127) break;
+				ascii[pos++] = code;
+			}
+			if (i == len) {
+				this.pos = pos;
+				return this;
+			}
+		}
+		this.ensureCapacity(len * 3 + 5);
+		const lenPrefixSizeGuess = varint32Size(len);
+		const buf = this.buffer;
+		const start = this.pos;
+		const { written } = this.encodeUtf8Into(value, buf.subarray(start + lenPrefixSizeGuess));
+		const lenPrefixSize = varint32Size(written);
+		if (lenPrefixSize != lenPrefixSizeGuess) buf.copyWithin(start + lenPrefixSize, start + lenPrefixSizeGuess, start + lenPrefixSizeGuess + written);
+		this.uint32(written);
+		this.pos += written;
+		return this;
+	}
+	/**
+	* Write a `float` value, 32-bit floating point number.
+	*/
+	float(value) {
+		assertFloat32(value);
+		this.ensureCapacity(4);
+		this.view().setFloat32(this.pos, value, true);
+		this.pos += 4;
+		return this;
+	}
+	/**
+	* Write a `double` value, a 64-bit floating point number.
+	*/
+	double(value) {
+		this.ensureCapacity(8);
+		this.view().setFloat64(this.pos, value, true);
+		this.pos += 8;
+		return this;
+	}
+	/**
+	* Write a `fixed32` value, an unsigned, fixed-length 32-bit integer.
+	*/
+	fixed32(value) {
+		assertUInt32(value);
+		this.ensureCapacity(4);
+		this.view().setUint32(this.pos, value, true);
+		this.pos += 4;
+		return this;
+	}
+	/**
+	* Write a `sfixed32` value, a signed, fixed-length 32-bit integer.
+	*/
+	sfixed32(value) {
+		assertInt32(value);
+		this.ensureCapacity(4);
+		this.view().setInt32(this.pos, value, true);
+		this.pos += 4;
+		return this;
+	}
+	/**
+	* Write a `sint32` value, a signed, zigzag-encoded 32-bit varint.
+	*/
+	sint32(value) {
+		assertInt32(value);
+		return this.uint32((value << 1 ^ value >> 31) >>> 0);
+	}
+	/**
+	* Write a `sfixed64` value, a signed, fixed-length 64-bit integer.
+	*/
+	sfixed64(value) {
+		const tc = protoInt64.enc(value);
+		this.ensureCapacity(8);
+		const view = this.view();
+		view.setInt32(this.pos, tc.lo, true);
+		view.setInt32(this.pos + 4, tc.hi, true);
+		this.pos += 8;
+		return this;
+	}
+	/**
+	* Write a `fixed64` value, an unsigned, fixed-length 64 bit integer.
+	*/
+	fixed64(value) {
+		const tc = protoInt64.uEnc(value);
+		this.ensureCapacity(8);
+		const view = this.view();
+		view.setInt32(this.pos, tc.lo, true);
+		view.setInt32(this.pos + 4, tc.hi, true);
+		this.pos += 8;
+		return this;
+	}
+	/**
+	* Write a `int64` value, a signed 64-bit varint.
+	*/
+	int64(value) {
+		const tc = protoInt64.enc(value);
+		return this.writeVarint64(tc.lo, tc.hi);
+	}
+	/**
+	* Write a `sint64` value, a signed, zig-zag-encoded 64-bit varint.
+	*/
+	sint64(value) {
+		const tc = protoInt64.enc(value), sign = tc.hi >> 31, lo = tc.lo << 1 ^ sign, hi = (tc.hi << 1 | tc.lo >>> 31) ^ sign;
+		return this.writeVarint64(lo, hi);
+	}
+	/**
+	* Write a `uint64` value, an unsigned 64-bit varint.
+	*/
+	uint64(value) {
+		const tc = protoInt64.uEnc(value);
+		return this.writeVarint64(tc.lo, tc.hi);
+	}
+	/**
+	* Write a 64-bit varint directly into the buffer. Accepts the value as
+	* split low/high 32-bit words.
+	*
+	* Ported from varint64write() to avoid the intermediate number[] buffer.
+	* See https://github.com/protocolbuffers/protobuf/blob/8a71927d74a4ce34efe2d8769fda198f52d20d12/js/experimental/runtime/kernel/writer.js#L344
+	*/
+	writeVarint64(lo, hi) {
+		this.ensureCapacity(10);
+		const buf = this.buffer;
+		let pos = this.pos;
+		for (let i = 0; i < 28; i = i + 7) {
+			const shift = lo >>> i;
+			const hasNext = !(shift >>> 7 == 0 && hi == 0);
+			buf[pos++] = (hasNext ? shift | 128 : shift) & 255;
+			if (!hasNext) {
+				this.pos = pos;
+				return this;
+			}
+		}
+		const splitBits = lo >>> 28 & 15 | (hi & 7) << 4;
+		const hasMoreBits = !(hi >> 3 == 0);
+		buf[pos++] = (hasMoreBits ? splitBits | 128 : splitBits) & 255;
+		if (!hasMoreBits) {
+			this.pos = pos;
+			return this;
+		}
+		for (let i = 3; i < 31; i = i + 7) {
+			const shift = hi >>> i;
+			const hasNext = !(shift >>> 7 == 0);
+			buf[pos++] = (hasNext ? shift | 128 : shift) & 255;
+			if (!hasNext) {
+				this.pos = pos;
+				return this;
+			}
+		}
+		buf[pos++] = hi >>> 31 & 1;
+		this.pos = pos;
+		return this;
+	}
+};
+/**
+* Capacity of the buffer allocated by the first write..
+*/
+const INITIAL_SIZE = 128;
+/**
+* Bytes `fork()` reserves for the length prefix, betting that the payload will
+* be under 128 bytes. `join()` fills them in, and widens them if the bet was
+* wrong.
+*/
+const DEFAULT_LEN_PREFIX_SIZE = 1;
+/**
+* Shared empty buffer used as the initial value before the first write.
+* Avoids allocating and zeroing `INITIAL_SIZE` bytes per BinaryWriter when a
+* writer is only used for a tiny message (or not used at all).
+*/
+const EMPTY_BUFFER = /* @__PURE__ */ new Uint8Array(0);
+/**
+* Shared empty view, paired with `EMPTY_BUFFER`. Never written to: any
+* fixed-width write first grows the buffer, which replaces this view.
+*/
+const EMPTY_VIEW = new DataView(EMPTY_BUFFER.buffer);
+/**
+* Longest string on the ASCII fast paths. Must stay below 0x80, so
+* that the writer's length prefix always fits a single varint byte.
+*/
+const ASCII_MAX_LENGTH = 32;
+/**
+* Number of bytes needed to encode `value` as an unsigned 32-bit varint.
+*/
+function varint32Size(value) {
+	if (value < 128) return 1;
+	if (value < 16384) return 2;
+	if (value < 2097152) return 3;
+	if (value < 268435456) return 4;
+	return 5;
+}
+var BinaryReader = class {
+	constructor(buf, decodeUtf8 = getTextEncoding().decodeUtf8) {
+		this.decodeUtf8 = decodeUtf8;
+		this.varint64Lo = 0;
+		this.varint64Hi = 0;
+		this.varint64 = varint64read;
+		/**
+		* Read a `uint32` field, an unsigned 32 bit varint.
+		*/
+		this.uint32 = varint32read;
+		this.buf = buf;
+		this.len = buf.length;
+		this.pos = 0;
+		this.view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+	}
+	/**
+	* Reads a tag - field number and wire type. Tags are uint32 varints; values
+	* that do not fit in uint32 are rejected.
+	*/
+	tag() {
+		const start = this.pos;
+		const tag = this.uint32();
+		const bytesRead = this.pos - start;
+		if (bytesRead > 5 || bytesRead == 5 && this.buf[this.pos - 1] > 15) throw new Error("illegal tag: varint overflows uint32");
+		const fieldNo = tag >>> 3;
+		const wireType = tag & 7;
+		if (fieldNo <= 0 || wireType > 5) throw new Error("illegal tag: field no " + fieldNo + " wire type " + wireType);
+		return [fieldNo, wireType];
+	}
+	/**
+	* Skip one element and return the skipped data.
+	*
+	* When skipping StartGroup, provide the tags field number to check for
+	* matching field number in the EndGroup tag. Recursion into nested groups
+	* is guarded by the `recursionLimit` argument: When the limit is reached,
+	* this method throws.
+	*/
+	skip(wireType, fieldNo, recursionLimit = 100) {
+		let start = this.pos;
+		switch (wireType) {
+			case WireType.Varint:
+				while (this.buf[this.pos++] & 128);
+				break;
+			case WireType.Bit64: this.pos += 4;
+			case WireType.Bit32:
+				this.pos += 4;
+				break;
+			case WireType.LengthDelimited:
+				let len = this.uint32();
+				this.pos += len;
+				break;
+			case WireType.StartGroup:
+				if (recursionLimit <= 0) throw new Error("maximum recursion depth reached");
+				for (;;) {
+					const [fn, wt] = this.tag();
+					if (wt === WireType.EndGroup) {
+						if (fieldNo !== void 0 && fn !== fieldNo) throw new Error("invalid end group tag");
+						break;
+					}
+					this.skip(wt, fn, recursionLimit - 1);
+				}
+				break;
+			default: throw new Error("cant skip wire type " + wireType);
+		}
+		this.assertBounds();
+		return this.buf.subarray(start, this.pos);
+	}
+	/**
+	* Throws error if position in byte array is out of range.
+	*/
+	assertBounds() {
+		if (this.pos > this.len) throw new RangeError("premature EOF");
+	}
+	/**
+	* Read a `int32` field, a signed 32 bit varint.
+	*/
+	int32() {
+		return this.uint32() | 0;
+	}
+	/**
+	* Read a `sint32` field, a signed, zigzag-encoded 32-bit varint.
+	*/
+	sint32() {
+		let zze = this.uint32();
+		return zze >>> 1 ^ -(zze & 1);
+	}
+	/**
+	* Read a `int64` field, a signed 64-bit varint.
+	*/
+	int64() {
+		this.varint64();
+		return protoInt64.dec(this.varint64Lo, this.varint64Hi);
+	}
+	/**
+	* Read a `uint64` field, an unsigned 64-bit varint.
+	*/
+	uint64() {
+		this.varint64();
+		return protoInt64.uDec(this.varint64Lo, this.varint64Hi);
+	}
+	/**
+	* Read a `sint64` field, a signed, zig-zag-encoded 64-bit varint.
+	*/
+	sint64() {
+		this.varint64();
+		let lo = this.varint64Lo;
+		let hi = this.varint64Hi;
+		let s = -(lo & 1);
+		lo = (lo >>> 1 | (hi & 1) << 31) ^ s;
+		hi = hi >>> 1 ^ s;
+		return protoInt64.dec(lo, hi);
+	}
+	/**
+	* Read a `bool` field, a variant.
+	*/
+	bool() {
+		const b = this.buf[this.pos];
+		if (b < 128) {
+			this.pos++;
+			return b !== 0;
+		}
+		this.varint64();
+		return this.varint64Lo !== 0 || this.varint64Hi !== 0;
+	}
+	/**
+	* Read a `fixed32` field, an unsigned, fixed-length 32-bit integer.
+	*/
+	fixed32() {
+		return this.view.getUint32((this.pos += 4) - 4, true);
+	}
+	/**
+	* Read a `sfixed32` field, a signed, fixed-length 32-bit integer.
+	*/
+	sfixed32() {
+		return this.view.getInt32((this.pos += 4) - 4, true);
+	}
+	/**
+	* Read a `fixed64` field, an unsigned, fixed-length 64 bit integer.
+	*/
+	fixed64() {
+		return protoInt64.uDec(this.sfixed32(), this.sfixed32());
+	}
+	/**
+	* Read a `fixed64` field, a signed, fixed-length 64-bit integer.
+	*/
+	sfixed64() {
+		return protoInt64.dec(this.sfixed32(), this.sfixed32());
+	}
+	/**
+	* Read a `float` field, 32-bit floating point number.
+	*/
+	float() {
+		return this.view.getFloat32((this.pos += 4) - 4, true);
+	}
+	/**
+	* Read a `double` field, a 64-bit floating point number.
+	*/
+	double() {
+		return this.view.getFloat64((this.pos += 8) - 8, true);
+	}
+	/**
+	* Read a `bytes` field, length-delimited arbitrary data.
+	*/
+	bytes() {
+		let len = this.uint32(), start = this.pos;
+		this.pos += len;
+		this.assertBounds();
+		return this.buf.subarray(start, start + len);
+	}
+	/**
+	* Read a `string` field, length-delimited data converted to UTF-8 text. If
+	* `strict` is true, throw on invalid UTF-8 instead of substituting U+FFFD.
+	*/
+	string(strict) {
+		const bytes = this.bytes();
+		const len = bytes.length;
+		if (len <= ASCII_MAX_LENGTH) {
+			const codes = new Array(len);
+			for (let i = 0; i < len; i++) {
+				const byte = bytes[i];
+				if (byte > 127) return this.decodeUtf8(bytes, strict);
+				codes[i] = byte;
+			}
+			return String.fromCharCode.apply(String, codes);
+		}
+		return this.decodeUtf8(bytes, strict);
+	}
+};
+/**
+* Assert a valid signed protobuf 32-bit integer as a number or string.
+*/
+function assertInt32(arg) {
+	if (typeof arg == "string") arg = Number(arg);
+	else if (typeof arg != "number") throw new Error("invalid int32: " + typeof arg);
+	if (!Number.isInteger(arg) || arg > 2147483647 || arg < -2147483648) throw new Error("invalid int32: " + arg);
+}
+/**
+* Assert a valid unsigned protobuf 32-bit integer as a number or string.
+*/
+function assertUInt32(arg) {
+	if (typeof arg == "string") arg = Number(arg);
+	else if (typeof arg != "number") throw new Error("invalid uint32: " + typeof arg);
+	if (!Number.isInteger(arg) || arg > 4294967295 || arg < 0) throw new Error("invalid uint32: " + arg);
+}
+/**
+* Assert a valid protobuf float value as a number or string.
+*/
+function assertFloat32(arg) {
+	if (typeof arg == "string") {
+		const o = arg;
+		arg = Number(arg);
+		if (Number.isNaN(arg) && o !== "NaN") throw new Error("invalid float32: " + o);
+	} else if (typeof arg != "number") throw new Error("invalid float32: " + typeof arg);
+	if (Number.isFinite(arg) && (arg > 34028234663852886e22 || arg < -34028234663852886e22)) throw new Error("invalid float32: " + arg);
+}
+//#endregion
+//#region src/networks/fetch_implementation.ts
+var FetchNetwork = class {
+	async invokeHttp({ method, uri, headers = {}, requestBody }) {
+		const response = await fetch(uri, {
+			method,
+			headers: new Headers(headers),
+			body: requestBody == null ? null : new ReadableStream({ start(controller) {
+				controller.enqueue(requestBody);
+				controller.close();
+			} })
+		});
+		const responseHeaders = {};
+		response.headers.forEach((value, key) => {
+			responseHeaders[key] = value;
+		});
+		return {
+			status: response.status,
+			headers: responseHeaders,
+			body: await response.bytes()
+		};
+	}
+};
+//#endregion
+//#region src/networks/wx_implementation.ts
+var WxNetwork = class {
+	invokeHttp({ method, uri, headers = {}, requestBody }) {
+		const buf = requestBody?.buffer;
+		return new Promise((resolve, reject) => {
+			const opts = {
+				url: uri,
+				method,
+				header: headers,
+				responseType: "arraybuffer",
+				timeout: 5e3,
+				success: (res) => {
+					resolve({
+						status: res.statusCode,
+						headers: res.header,
+						body: new Uint8Array(res.data)
+					});
+				},
+				fail: (err) => {
+					reject(err);
+				}
+			};
+			if (buf != null) opts.data = buf;
+			wx.request(opts);
+		});
+	}
+};
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/util.js
+var require_util = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.flatten = exports.unique = exports.hardMixProtos = exports.nearestCommonProto = exports.protoChain = exports.copyProps = void 0;
+	/**
+	* Utility function that works like `Object.apply`, but copies getters and setters properly as well.  Additionally gives
+	* the option to exclude properties by name.
+	*/
+	const copyProps = (dest, src, exclude = []) => {
+		const props = Object.getOwnPropertyDescriptors(src);
+		for (let prop of exclude) delete props[prop];
+		Object.defineProperties(dest, props);
+	};
+	exports.copyProps = copyProps;
+	/**
+	* Returns the full chain of prototypes up until Object.prototype given a starting object.  The order of prototypes will
+	* be closest to farthest in the chain.
+	*/
+	const protoChain = (obj, currentChain = [obj]) => {
+		const proto = Object.getPrototypeOf(obj);
+		if (proto === null) return currentChain;
+		return (0, exports.protoChain)(proto, [...currentChain, proto]);
+	};
+	exports.protoChain = protoChain;
+	/**
+	* Identifies the nearest ancestor common to all the given objects in their prototype chains.  For most unrelated
+	* objects, this function should return Object.prototype.
+	*/
+	const nearestCommonProto = (...objs) => {
+		if (objs.length === 0) return void 0;
+		let commonProto = void 0;
+		const protoChains = objs.map((obj) => (0, exports.protoChain)(obj));
+		while (protoChains.every((protoChain) => protoChain.length > 0)) {
+			const protos = protoChains.map((protoChain) => protoChain.pop());
+			const potentialCommonProto = protos[0];
+			if (protos.every((proto) => proto === potentialCommonProto)) commonProto = potentialCommonProto;
+			else break;
+		}
+		return commonProto;
+	};
+	exports.nearestCommonProto = nearestCommonProto;
+	/**
+	* Creates a new prototype object that is a mixture of the given prototypes.  The mixing is achieved by first
+	* identifying the nearest common ancestor and using it as the prototype for a new object.  Then all properties/methods
+	* downstream of this prototype (ONLY downstream) are copied into the new object.
+	*
+	* The resulting prototype is more performant than softMixProtos(...), as well as ES5 compatible.  However, it's not as
+	* flexible as updates to the source prototypes aren't captured by the mixed result.  See softMixProtos for why you may
+	* want to use that instead.
+	*/
+	const hardMixProtos = (ingredients, constructor, exclude = []) => {
+		var _a;
+		const base = (_a = (0, exports.nearestCommonProto)(...ingredients)) !== null && _a !== void 0 ? _a : Object.prototype;
+		const mixedProto = Object.create(base);
+		const visitedProtos = (0, exports.protoChain)(base);
+		for (let prototype of ingredients) {
+			let protos = (0, exports.protoChain)(prototype);
+			for (let i = protos.length - 1; i >= 0; i--) {
+				let newProto = protos[i];
+				if (visitedProtos.indexOf(newProto) === -1) {
+					(0, exports.copyProps)(mixedProto, newProto, ["constructor", ...exclude]);
+					visitedProtos.push(newProto);
+				}
+			}
+		}
+		mixedProto.constructor = constructor;
+		return mixedProto;
+	};
+	exports.hardMixProtos = hardMixProtos;
+	const unique = (arr) => arr.filter((e, i) => arr.indexOf(e) == i);
+	exports.unique = unique;
+	const flatten = (arr) => arr.length === 0 ? [] : arr.length === 1 ? arr[0] : arr.reduce((a1, a2) => [...a1, ...a2]);
+	exports.flatten = flatten;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/proxy.js
+var require_proxy = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.softMixProtos = exports.proxyMix = exports.getIngredientWithProp = void 0;
+	const util_1 = require_util();
+	/**
+	* Finds the ingredient with the given prop, searching in reverse order and breadth-first if searching ingredient
+	* prototypes is required.
+	*/
+	const getIngredientWithProp = (prop, ingredients) => {
+		const protoChains = ingredients.map((ingredient) => (0, util_1.protoChain)(ingredient));
+		let protoDepth = 0;
+		let protosAreLeftToSearch = true;
+		while (protosAreLeftToSearch) {
+			protosAreLeftToSearch = false;
+			for (let i = ingredients.length - 1; i >= 0; i--) {
+				const searchTarget = protoChains[i][protoDepth];
+				if (searchTarget !== void 0 && searchTarget !== null) {
+					protosAreLeftToSearch = true;
+					if (Object.getOwnPropertyDescriptor(searchTarget, prop) != void 0) return protoChains[i][0];
+				}
+			}
+			protoDepth++;
+		}
+	};
+	exports.getIngredientWithProp = getIngredientWithProp;
+	/**
+	* "Mixes" ingredients by wrapping them in a Proxy.  The optional prototype argument allows the mixed object to sit
+	* downstream of an existing prototype chain.  Note that "properties" cannot be added, deleted, or modified.
+	*/
+	const proxyMix = (ingredients, prototype = Object.prototype) => new Proxy({}, {
+		getPrototypeOf() {
+			return prototype;
+		},
+		setPrototypeOf() {
+			throw Error("Cannot set prototype of Proxies created by ts-mixer");
+		},
+		getOwnPropertyDescriptor(_, prop) {
+			return Object.getOwnPropertyDescriptor((0, exports.getIngredientWithProp)(prop, ingredients) || {}, prop);
+		},
+		defineProperty() {
+			throw new Error("Cannot define new properties on Proxies created by ts-mixer");
+		},
+		has(_, prop) {
+			return (0, exports.getIngredientWithProp)(prop, ingredients) !== void 0 || prototype[prop] !== void 0;
+		},
+		get(_, prop) {
+			return ((0, exports.getIngredientWithProp)(prop, ingredients) || prototype)[prop];
+		},
+		set(_, prop, val) {
+			const ingredientWithProp = (0, exports.getIngredientWithProp)(prop, ingredients);
+			if (ingredientWithProp === void 0) throw new Error("Cannot set new properties on Proxies created by ts-mixer");
+			ingredientWithProp[prop] = val;
+			return true;
+		},
+		deleteProperty() {
+			throw new Error("Cannot delete properties on Proxies created by ts-mixer");
+		},
+		ownKeys() {
+			return ingredients.map(Object.getOwnPropertyNames).reduce((prev, curr) => curr.concat(prev.filter((key) => curr.indexOf(key) < 0)));
+		}
+	});
+	exports.proxyMix = proxyMix;
+	/**
+	* Creates a new proxy-prototype object that is a "soft" mixture of the given prototypes.  The mixing is achieved by
+	* proxying all property access to the ingredients.  This is not ES5 compatible and less performant.  However, any
+	* changes made to the source prototypes will be reflected in the proxy-prototype, which may be desirable.
+	*/
+	const softMixProtos = (ingredients, constructor) => (0, exports.proxyMix)([...ingredients, { constructor }]);
+	exports.softMixProtos = softMixProtos;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/settings.js
+var require_settings = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.settings = void 0;
+	exports.settings = {
+		initFunction: null,
+		staticsStrategy: "copy",
+		prototypeStrategy: "copy",
+		decoratorInheritance: "deep"
+	};
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/mixin-tracking.js
+var require_mixin_tracking = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.hasMixin = exports.registerMixins = exports.getMixinsForClass = void 0;
+	const util_1 = require_util();
+	const mixins = /* @__PURE__ */ new WeakMap();
+	const getMixinsForClass = (clazz) => mixins.get(clazz);
+	exports.getMixinsForClass = getMixinsForClass;
+	const registerMixins = (mixedClass, constituents) => mixins.set(mixedClass, constituents);
+	exports.registerMixins = registerMixins;
+	const hasMixin = (instance, mixin) => {
+		if (instance instanceof mixin) return true;
+		const constructor = instance.constructor;
+		const visited = /* @__PURE__ */ new Set();
+		let frontier = /* @__PURE__ */ new Set();
+		frontier.add(constructor);
+		while (frontier.size > 0) {
+			if (frontier.has(mixin)) return true;
+			frontier.forEach((item) => visited.add(item));
+			const newFrontier = /* @__PURE__ */ new Set();
+			frontier.forEach((item) => {
+				var _a;
+				const itemConstituents = (_a = mixins.get(item)) !== null && _a !== void 0 ? _a : (0, util_1.protoChain)(item.prototype).map((proto) => proto.constructor).filter((item) => item !== null);
+				if (itemConstituents) itemConstituents.forEach((constituent) => {
+					if (!visited.has(constituent) && !frontier.has(constituent)) newFrontier.add(constituent);
+				});
+			});
+			frontier = newFrontier;
+		}
+		return false;
+	};
+	exports.hasMixin = hasMixin;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/decorator.js
+var require_decorator = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.decorate = exports.getDecoratorsForClass = exports.directDecoratorSearch = exports.deepDecoratorSearch = void 0;
+	const util_1 = require_util();
+	const mixin_tracking_1 = require_mixin_tracking();
+	const mergeObjectsOfDecorators = (o1, o2) => {
+		var _a, _b;
+		const allKeys = (0, util_1.unique)([...Object.getOwnPropertyNames(o1), ...Object.getOwnPropertyNames(o2)]);
+		const mergedObject = {};
+		for (let key of allKeys) mergedObject[key] = (0, util_1.unique)([...(_a = o1 === null || o1 === void 0 ? void 0 : o1[key]) !== null && _a !== void 0 ? _a : [], ...(_b = o2 === null || o2 === void 0 ? void 0 : o2[key]) !== null && _b !== void 0 ? _b : []]);
+		return mergedObject;
+	};
+	const mergePropertyAndMethodDecorators = (d1, d2) => {
+		var _a, _b, _c, _d;
+		return {
+			property: mergeObjectsOfDecorators((_a = d1 === null || d1 === void 0 ? void 0 : d1.property) !== null && _a !== void 0 ? _a : {}, (_b = d2 === null || d2 === void 0 ? void 0 : d2.property) !== null && _b !== void 0 ? _b : {}),
+			method: mergeObjectsOfDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.method) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.method) !== null && _d !== void 0 ? _d : {})
+		};
+	};
+	const mergeDecorators = (d1, d2) => {
+		var _a, _b, _c, _d, _e, _f;
+		return {
+			class: (0, util_1.unique)([...(_a = d1 === null || d1 === void 0 ? void 0 : d1.class) !== null && _a !== void 0 ? _a : [], ...(_b = d2 === null || d2 === void 0 ? void 0 : d2.class) !== null && _b !== void 0 ? _b : []]),
+			static: mergePropertyAndMethodDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.static) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.static) !== null && _d !== void 0 ? _d : {}),
+			instance: mergePropertyAndMethodDecorators((_e = d1 === null || d1 === void 0 ? void 0 : d1.instance) !== null && _e !== void 0 ? _e : {}, (_f = d2 === null || d2 === void 0 ? void 0 : d2.instance) !== null && _f !== void 0 ? _f : {})
+		};
+	};
+	const decorators = /* @__PURE__ */ new Map();
+	const findAllConstituentClasses = (...classes) => {
+		var _a;
+		const allClasses = /* @__PURE__ */ new Set();
+		const frontier = /* @__PURE__ */ new Set([...classes]);
+		while (frontier.size > 0) for (let clazz of frontier) {
+			const protoChainClasses = (0, util_1.protoChain)(clazz.prototype).map((proto) => proto.constructor);
+			const mixinClasses = (_a = (0, mixin_tracking_1.getMixinsForClass)(clazz)) !== null && _a !== void 0 ? _a : [];
+			const newClasses = [...protoChainClasses, ...mixinClasses].filter((c) => !allClasses.has(c));
+			for (let newClass of newClasses) frontier.add(newClass);
+			allClasses.add(clazz);
+			frontier.delete(clazz);
+		}
+		return [...allClasses];
+	};
+	const deepDecoratorSearch = (...classes) => {
+		const decoratorsForClassChain = findAllConstituentClasses(...classes).map((clazz) => decorators.get(clazz)).filter((decorators) => !!decorators);
+		if (decoratorsForClassChain.length == 0) return {};
+		if (decoratorsForClassChain.length == 1) return decoratorsForClassChain[0];
+		return decoratorsForClassChain.reduce((d1, d2) => mergeDecorators(d1, d2));
+	};
+	exports.deepDecoratorSearch = deepDecoratorSearch;
+	const directDecoratorSearch = (...classes) => {
+		const classDecorators = classes.map((clazz) => (0, exports.getDecoratorsForClass)(clazz));
+		if (classDecorators.length === 0) return {};
+		if (classDecorators.length === 1) return classDecorators[0];
+		return classDecorators.reduce((d1, d2) => mergeDecorators(d1, d2));
+	};
+	exports.directDecoratorSearch = directDecoratorSearch;
+	const getDecoratorsForClass = (clazz) => {
+		let decoratorsForClass = decorators.get(clazz);
+		if (!decoratorsForClass) {
+			decoratorsForClass = {};
+			decorators.set(clazz, decoratorsForClass);
+		}
+		return decoratorsForClass;
+	};
+	exports.getDecoratorsForClass = getDecoratorsForClass;
+	const decorateClass = (decorator) => ((clazz) => {
+		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
+		let classDecorators = decoratorsForClass.class;
+		if (!classDecorators) {
+			classDecorators = [];
+			decoratorsForClass.class = classDecorators;
+		}
+		classDecorators.push(decorator);
+		return decorator(clazz);
+	});
+	const decorateMember = (decorator) => ((object, key, ...otherArgs) => {
+		var _a, _b, _c;
+		const decoratorTargetType = typeof object === "function" ? "static" : "instance";
+		const decoratorType = typeof object[key] === "function" ? "method" : "property";
+		const clazz = decoratorTargetType === "static" ? object : object.constructor;
+		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
+		const decoratorsForTargetType = (_a = decoratorsForClass === null || decoratorsForClass === void 0 ? void 0 : decoratorsForClass[decoratorTargetType]) !== null && _a !== void 0 ? _a : {};
+		decoratorsForClass[decoratorTargetType] = decoratorsForTargetType;
+		let decoratorsForType = (_b = decoratorsForTargetType === null || decoratorsForTargetType === void 0 ? void 0 : decoratorsForTargetType[decoratorType]) !== null && _b !== void 0 ? _b : {};
+		decoratorsForTargetType[decoratorType] = decoratorsForType;
+		let decoratorsForKey = (_c = decoratorsForType === null || decoratorsForType === void 0 ? void 0 : decoratorsForType[key]) !== null && _c !== void 0 ? _c : [];
+		decoratorsForType[key] = decoratorsForKey;
+		decoratorsForKey.push(decorator);
+		return decorator(object, key, ...otherArgs);
+	});
+	const decorate = (decorator) => ((...args) => {
+		if (args.length === 1) return decorateClass(decorator)(args[0]);
+		return decorateMember(decorator)(...args);
+	});
+	exports.decorate = decorate;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/mixins.js
+var require_mixins = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.mix = exports.Mixin = void 0;
+	const proxy_1 = require_proxy();
+	const settings_1 = require_settings();
+	const util_1 = require_util();
+	const decorator_1 = require_decorator();
+	const mixin_tracking_1 = require_mixin_tracking();
+	function Mixin(...constructors) {
+		var _a, _b, _c;
+		const prototypes = constructors.map((constructor) => constructor.prototype);
+		const initFunctionName = settings_1.settings.initFunction;
+		if (initFunctionName !== null) {
+			const initFunctions = prototypes.map((proto) => proto[initFunctionName]).filter((func) => typeof func === "function");
+			const combinedInitFunction = function(...args) {
+				for (let initFunction of initFunctions) initFunction.apply(this, args);
+			};
+			const extraProto = { [initFunctionName]: combinedInitFunction };
+			prototypes.push(extraProto);
+		}
+		function MixedClass(...args) {
+			for (const constructor of constructors) (0, util_1.copyProps)(this, new constructor(...args));
+			if (initFunctionName !== null && typeof this[initFunctionName] === "function") this[initFunctionName].apply(this, args);
+		}
+		MixedClass.prototype = settings_1.settings.prototypeStrategy === "copy" ? (0, util_1.hardMixProtos)(prototypes, MixedClass) : (0, proxy_1.softMixProtos)(prototypes, MixedClass);
+		Object.setPrototypeOf(MixedClass, settings_1.settings.staticsStrategy === "copy" ? (0, util_1.hardMixProtos)(constructors, null, ["prototype"]) : (0, proxy_1.proxyMix)(constructors, Function.prototype));
+		let DecoratedMixedClass = MixedClass;
+		if (settings_1.settings.decoratorInheritance !== "none") {
+			const classDecorators = settings_1.settings.decoratorInheritance === "deep" ? (0, decorator_1.deepDecoratorSearch)(...constructors) : (0, decorator_1.directDecoratorSearch)(...constructors);
+			for (let decorator of (_a = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.class) !== null && _a !== void 0 ? _a : []) {
+				const result = decorator(DecoratedMixedClass);
+				if (result) DecoratedMixedClass = result;
+			}
+			applyPropAndMethodDecorators((_b = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.static) !== null && _b !== void 0 ? _b : {}, DecoratedMixedClass);
+			applyPropAndMethodDecorators((_c = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.instance) !== null && _c !== void 0 ? _c : {}, DecoratedMixedClass.prototype);
+		}
+		(0, mixin_tracking_1.registerMixins)(DecoratedMixedClass, constructors);
+		return DecoratedMixedClass;
+	}
+	exports.Mixin = Mixin;
+	const applyPropAndMethodDecorators = (propAndMethodDecorators, target) => {
+		const propDecorators = propAndMethodDecorators.property;
+		const methodDecorators = propAndMethodDecorators.method;
+		if (propDecorators) for (let key in propDecorators) for (let decorator of propDecorators[key]) decorator(target, key);
+		if (methodDecorators) for (let key in methodDecorators) for (let decorator of methodDecorators[key]) decorator(target, key, Object.getOwnPropertyDescriptor(target, key));
+	};
+	/**
+	* A decorator version of the `Mixin` function.  You'll want to use this instead of `Mixin` for mixing generic classes.
+	*/
+	const mix = (...ingredients) => (decoratedClass) => {
+		const mixedClass = Mixin(...ingredients.concat([decoratedClass]));
+		Object.defineProperty(mixedClass, "name", {
+			value: decoratedClass.name,
+			writable: false
+		});
+		return mixedClass;
+	};
+	exports.mix = mix;
+}));
+//#endregion
+//#region src/networks/network.ts
+var import_cjs = (/* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.hasMixin = exports.decorate = exports.settings = exports.mix = exports.Mixin = void 0;
+	var mixins_1 = require_mixins();
+	Object.defineProperty(exports, "Mixin", {
+		enumerable: true,
+		get: function() {
+			return mixins_1.Mixin;
+		}
+	});
+	Object.defineProperty(exports, "mix", {
+		enumerable: true,
+		get: function() {
+			return mixins_1.mix;
+		}
+	});
+	var settings_1 = require_settings();
+	Object.defineProperty(exports, "settings", {
+		enumerable: true,
+		get: function() {
+			return settings_1.settings;
+		}
+	});
+	var decorator_1 = require_decorator();
+	Object.defineProperty(exports, "decorate", {
+		enumerable: true,
+		get: function() {
+			return decorator_1.decorate;
+		}
+	});
+	var mixin_tracking_1 = require_mixin_tracking();
+	Object.defineProperty(exports, "hasMixin", {
+		enumerable: true,
+		get: function() {
+			return mixin_tracking_1.hasMixin;
+		}
+	});
+})))();
+function composeUri({ base, path = "/", params = {} }) {
+	while (base.endsWith("/")) base = base.substring(0, base.length - 1);
+	while (path.startsWith("/")) path = path.substring(1);
+	let addr = `${base}/${path}`;
+	if (params != null) {
+		let firstParam = true;
+		for (const name in params) {
+			const value = params[name];
+			if (firstParam) {
+				firstParam = false;
+				addr += "?";
+			} else addr += "&";
+			addr += encodeURIComponent(name);
+			addr += "=";
+			switch (typeof value) {
+				case "boolean":
+				case "number":
+				case "bigint":
+					addr += value;
+					break;
+				case "string":
+					addr += encodeURIComponent(value);
+					break;
+				case "undefined": break;
+				default: throw `path param type ${typeof value}: ${value}`;
+			}
+		}
+	}
+	return addr;
+}
+//#endregion
+//#region src/models/client/api/shared.ts
+function responseStatusFromJSON(object) {
+	switch (object) {
+		case 0:
+		case "Ok": return 0;
+		case 1:
+		case "ServerError": return 1;
+		case 2:
+		case "BadRequest": return 2;
+		default: return -1;
+	}
+}
+function responseStatusToJSON(object) {
+	switch (object) {
+		case 0: return "Ok";
+		case 1: return "ServerError";
+		case 2: return "BadRequest";
+		default: return "UNRECOGNIZED";
+	}
+}
+function createBaseCommonApiData() {
+	return {
+		appId: 0,
+		path: "",
+		sceneId: 0
+	};
+}
+const CommonApiData = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.appId !== 0) writer.uint32(8).int32(message.appId);
+		if (message.path !== "") writer.uint32(18).string(message.path);
+		if (message.sceneId !== 0) writer.uint32(24).int32(message.sceneId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCommonApiData();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.appId = reader.int32();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.path = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.sceneId = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			appId: isSet$5(object.appId) ? globalThis.Number(object.appId) : 0,
+			path: isSet$5(object.path) ? globalThis.String(object.path) : "",
+			sceneId: isSet$5(object.sceneId) ? globalThis.Number(object.sceneId) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.appId !== 0) obj.appId = Math.round(message.appId);
+		if (message.path !== "") obj.path = message.path;
+		if (message.sceneId !== 0) obj.sceneId = Math.round(message.sceneId);
+		return obj;
+	},
+	create(base) {
+		return CommonApiData.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCommonApiData();
+		message.appId = object.appId ?? 0;
+		message.path = object.path ?? "";
+		message.sceneId = object.sceneId ?? 0;
+		return message;
+	}
+};
+function createBaseCommonResponseData() {
+	return {
+		status: 0,
+		message: ""
+	};
+}
+const CommonResponseData = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.status !== 0) writer.uint32(8).int32(message.status);
+		if (message.message !== "") writer.uint32(18).string(message.message);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCommonResponseData();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.status = reader.int32();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.message = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			status: isSet$5(object.status) ? responseStatusFromJSON(object.status) : 0,
+			message: isSet$5(object.message) ? globalThis.String(object.message) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.status !== 0) obj.status = responseStatusToJSON(message.status);
+		if (message.message !== "") obj.message = message.message;
+		return obj;
+	},
+	create(base) {
+		return CommonResponseData.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCommonResponseData();
+		message.status = object.status ?? 0;
+		message.message = object.message ?? "";
+		return message;
+	}
+};
+function isSet$5(value) {
+	return value !== null && value !== void 0;
+}
+const allInOnePool = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`;
+function genRandomText(opts) {
+	const { pool = allInOnePool, count = 8 } = opts ?? {};
+	let s = "";
+	for (let i = 0; i < count; i++) s += pool[Math.floor(Math.random() * pool.length)];
+	return s;
+}
+//#endregion
+//#region src/apis/session.ts
+var BaseSessionManagement = class {
+	constructor(appId) {
+		this.session = "<uninit>";
+		this.cacheOpenId = new CachedString("current_open_id");
+		this.cacheShareMark = new CachedString("current_share_mark");
+		this.cachedPath = "unknown";
+		this.cachedSceneId = -1;
+		this.appActive = true;
+		this.authCheck = Promise.reject("auth not init");
+		this.openApp = void 0;
+		this.appId = appId;
+	}
+	onLaunch({ sceneId }) {
+		this.appActive = true;
+		this.session = genRandomText();
+		this.cachedSceneId = sceneId;
+	}
+	onShow({ sceneId }) {
+		this.appActive = true;
+		this.cachedSceneId = sceneId ?? this.cachedSceneId;
+		this.authCheck = this.doAuthCheck();
+		this.updateAppInfo();
+	}
+	onHide() {
+		this.appActive = false;
+		this.authCheck = Promise.reject("app hide");
+	}
+	onPageChange(page) {
+		const pages = getCurrentPages();
+		if (pages.length == 0) return;
+		let path;
+		let trimParams = {};
+		if (page == null) {
+			const current = pages[pages.length - 1];
+			if (current == null) return;
+			path = current.path;
+			for (const k in current.options) {
+				const v = current.options[k];
+				if (v == null) continue;
+				trimParams[k] = v;
+			}
+		} else {
+			path = page.path;
+			if (page?.params != null) for (const k in page.params) {
+				const v = page.params[k];
+				if (v == null) continue;
+				trimParams[k] = v;
+			}
+		}
+		if (this.cachedPath == path) return;
+		this.cachedPath = path;
+		this.reportOneLog((base) => [{
+			base,
+			openPage: { params: trimParams }
+		}]);
+	}
+	updateCachedOpenId(openId) {
+		this.cacheOpenId.value = openId;
+	}
+	readCachedOpenId() {
+		return this.cacheOpenId.value;
+	}
+	async authedOpenId() {
+		await this.authCheck;
+		return this.cacheOpenId.value;
+	}
+	updateCachedShareMark(shareMark) {
+		this.cacheShareMark.value = shareMark;
+	}
+	readCachedShareMark() {
+		return this.cacheShareMark.value;
+	}
+	async authedShareMark() {
+		await this.authCheck;
+		return this.cacheShareMark.value;
+	}
+	obtainCommonApiData() {
+		return {
+			appId: this.appId,
+			path: this.cachedPath,
+			sceneId: this.cachedSceneId
+		};
+	}
+	userSessionCheck(_) {
+		throw new Error("user session check unimplemented");
+	}
+	userLogin(_) {
+		throw new Error("user login unimplemented");
+	}
+	reportOneLog(_) {
+		throw new Error("report one log unimplemented");
+	}
+	async doAuthCheck() {
+		const { needLogin } = await (async (openId) => {
+			try {
+				if (openId.length > 0) return await this.userSessionCheck({ openId });
+			} catch (e) {}
+			return { needLogin: true };
+		})(this.cacheOpenId.value.trim());
+		if (!needLogin) return;
+		const response = await wx.login();
+		while (this.appActive) try {
+			await this.userLogin({ code: response.code });
+			return;
+		} catch (e) {
+			await new Promise((resolve) => setTimeout(resolve, 1e3));
+		}
+	}
+	updateAppInfo() {
+		const opts = wx.getEnterOptionsSync();
+		let path = opts?.path;
+		if (opts.query != null) for (const k in opts.query) {
+			path ?? (path = "");
+			if (path.indexOf("?") < 0) path += "?";
+			else path += "&";
+			path += encodeURIComponent(k);
+			const v = opts.query[k];
+			if (v == null) continue;
+			path += "=";
+			path += encodeURIComponent(v);
+		}
+		const newOpenApp = {
+			path,
+			chatType: opts?.chatType,
+			scene: opts?.scene
+		};
+		wx.getGroupEnterInfo({
+			success: (v) => {
+				newOpenApp.groupIv = v.iv;
+				newOpenApp.groupEncryptedData = v.encryptedData;
+				this.updateOpenApp(newOpenApp);
+			},
+			fail: () => {
+				this.updateOpenApp(newOpenApp);
+			}
+		});
+	}
+	updateOpenApp(newOpenApp) {
+		if (this.openApp != null && this.openApp?.path == newOpenApp.path && this.openApp?.scene == newOpenApp.scene) return;
+		this.openApp = newOpenApp;
+		this.reportOneLog((base) => [{
+			base,
+			openApp: newOpenApp
+		}]);
+	}
+};
+var CachedString = class {
+	constructor(key, empty) {
+		this.key = key;
+		this.empty = empty ?? "";
+		this.cache = void 0;
+	}
+	get value() {
+		if (this.cache == null) try {
+			this.cache = wx.getStorageSync(this.key);
+		} catch (e) {}
+		return this.cache ?? this.empty;
+	}
+	set value(v) {
+		this.cache = v;
+		wx.setStorageSync(this.key, v);
+	}
+};
+//#endregion
+//#region src/apis/base.ts
+var BaseApi = class extends BaseSessionManagement {
+	constructor(appId, base, network) {
+		super(appId);
+		this.base = base;
+		this.network = network;
+	}
+	async invokeProtoApi(options) {
+		const response = await this.network.invokeHttp({
+			method: options.method ?? "POST",
+			uri: composeUri({
+				base: this.base,
+				path: options.path,
+				params: options.params
+			}),
+			headers: { "Content-Type": "application/protobuf" },
+			requestBody: options.requestMeta.encode(options.requestBody).finish()
+		});
+		response.headers["access-id"];
+		const body = options.responseMeta.decode(response.body);
+		checkApiResponse(options.extractor.commonOf(body));
+		return options.extractor.bodyOf(body);
+	}
+};
+var BadResponseException = class extends Error {
+	get name() {
+		return "BaseResponse";
+	}
+	constructor(message) {
+		super();
+		this.message = message;
+	}
+};
+var ApiException = class extends Error {
+	get name() {
+		return "ApiException";
+	}
+	constructor(status, message) {
+		super();
+		this.status = status;
+		this.message = message;
+	}
+};
+function checkApiResponse(common) {
+	if (common == null) throw new BadResponseException("no common data");
+	if (common.status != 0) throw new ApiException(common.status, common.message);
+}
+//#endregion
+//#region src/models/client/api/user.ts
+function createBaseSessionCheckRequest() {
+	return {
+		common: void 0,
+		openId: ""
+	};
+}
+const SessionCheckRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseSessionCheckRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		return obj;
+	},
+	create(base) {
+		return SessionCheckRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseSessionCheckRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		return message;
+	}
+};
+function createBaseSessionCheckResponse() {
+	return {
+		common: void 0,
+		needLogin: false,
+		shareMark: ""
+	};
+}
+const SessionCheckResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.needLogin !== false) writer.uint32(16).bool(message.needLogin);
+		if (message.shareMark !== "") writer.uint32(26).string(message.shareMark);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseSessionCheckResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.needLogin = reader.bool();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.shareMark = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			needLogin: isSet$4(object.needLogin) ? globalThis.Boolean(object.needLogin) : false,
+			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.needLogin !== false) obj.needLogin = message.needLogin;
+		if (message.shareMark !== "") obj.shareMark = message.shareMark;
+		return obj;
+	},
+	create(base) {
+		return SessionCheckResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseSessionCheckResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.needLogin = object.needLogin ?? false;
+		message.shareMark = object.shareMark ?? "";
+		return message;
+	}
+};
+function createBaseLoginRequest() {
+	return {
+		common: void 0,
+		code: ""
+	};
+}
+const LoginRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.code !== "") writer.uint32(18).string(message.code);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseLoginRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.code = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			code: isSet$4(object.code) ? globalThis.String(object.code) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.code !== "") obj.code = message.code;
+		return obj;
+	},
+	create(base) {
+		return LoginRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseLoginRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.code = object.code ?? "";
+		return message;
+	}
+};
+function createBaseLoginResponse() {
+	return {
+		common: void 0,
+		openId: "",
+		shareMark: ""
+	};
+}
+const LoginResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.shareMark !== "") writer.uint32(26).string(message.shareMark);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseLoginResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.shareMark = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : "",
+			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.shareMark !== "") obj.shareMark = message.shareMark;
+		return obj;
+	},
+	create(base) {
+		return LoginResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseLoginResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.shareMark = object.shareMark ?? "";
+		return message;
+	}
+};
+function createBaseReportSessionCorruptRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		expect: "",
+		actual: "",
+		page: ""
+	};
+}
+const ReportSessionCorruptRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.expect !== "") writer.uint32(26).string(message.expect);
+		if (message.actual !== "") writer.uint32(34).string(message.actual);
+		if (message.page !== "") writer.uint32(42).string(message.page);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseReportSessionCorruptRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.expect = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.actual = reader.string();
+						continue;
+					case 5:
+						if (tag !== 42) break;
+						message.page = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : "",
+			expect: isSet$4(object.expect) ? globalThis.String(object.expect) : "",
+			actual: isSet$4(object.actual) ? globalThis.String(object.actual) : "",
+			page: isSet$4(object.page) ? globalThis.String(object.page) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.expect !== "") obj.expect = message.expect;
+		if (message.actual !== "") obj.actual = message.actual;
+		if (message.page !== "") obj.page = message.page;
+		return obj;
+	},
+	create(base) {
+		return ReportSessionCorruptRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseReportSessionCorruptRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.expect = object.expect ?? "";
+		message.actual = object.actual ?? "";
+		message.page = object.page ?? "";
+		return message;
+	}
+};
+function createBaseReportSessionCorruptResponse() {
+	return {
+		common: void 0,
+		shareMark: ""
+	};
+}
+const ReportSessionCorruptResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.shareMark !== "") writer.uint32(18).string(message.shareMark);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseReportSessionCorruptResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.shareMark = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.shareMark !== "") obj.shareMark = message.shareMark;
+		return obj;
+	},
+	create(base) {
+		return ReportSessionCorruptResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseReportSessionCorruptResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.shareMark = object.shareMark ?? "";
+		return message;
+	}
+};
+function isSet$4(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/apis/api_report_session_corrupt.ts
+var ApiReportSessionCorrupt = class extends BaseApi {
+	async reportSessionCorrupt({ openId, expect, actual, page }) {
+		const { shareMark } = await this.invokeProtoApi({
+			path: "/media-hub/user/report-session-corrupt",
+			requestMeta: ReportSessionCorruptRequest,
+			responseMeta: ReportSessionCorruptResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				expect,
+				actual,
+				page
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({ shareMark: response.shareMark })
+			}
+		});
+		this.updateCachedShareMark(shareMark);
+	}
+};
+//#endregion
+//#region src/models/client/log/activity.ts
+function createBaseOpenApp() {
+	return {
+		path: void 0,
+		scene: void 0,
+		chatType: void 0,
+		groupEncryptedData: void 0,
+		groupIv: void 0
+	};
+}
+const OpenApp = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.path !== void 0) writer.uint32(10).string(message.path);
+		if (message.scene !== void 0) writer.uint32(16).int32(message.scene);
+		if (message.chatType !== void 0) writer.uint32(24).int32(message.chatType);
+		if (message.groupEncryptedData !== void 0) writer.uint32(34).string(message.groupEncryptedData);
+		if (message.groupIv !== void 0) writer.uint32(42).string(message.groupIv);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseOpenApp();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.path = reader.string();
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.scene = reader.int32();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.chatType = reader.int32();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.groupEncryptedData = reader.string();
+						continue;
+					case 5:
+						if (tag !== 42) break;
+						message.groupIv = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			path: isSet$3(object.path) ? globalThis.String(object.path) : void 0,
+			scene: isSet$3(object.scene) ? globalThis.Number(object.scene) : void 0,
+			chatType: isSet$3(object.chatType) ? globalThis.Number(object.chatType) : void 0,
+			groupEncryptedData: isSet$3(object.groupEncryptedData) ? globalThis.String(object.groupEncryptedData) : void 0,
+			groupIv: isSet$3(object.groupIv) ? globalThis.String(object.groupIv) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.path !== void 0) obj.path = message.path;
+		if (message.scene !== void 0) obj.scene = Math.round(message.scene);
+		if (message.chatType !== void 0) obj.chatType = Math.round(message.chatType);
+		if (message.groupEncryptedData !== void 0) obj.groupEncryptedData = message.groupEncryptedData;
+		if (message.groupIv !== void 0) obj.groupIv = message.groupIv;
+		return obj;
+	},
+	create(base) {
+		return OpenApp.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseOpenApp();
+		message.path = object.path ?? void 0;
+		message.scene = object.scene ?? void 0;
+		message.chatType = object.chatType ?? void 0;
+		message.groupEncryptedData = object.groupEncryptedData ?? void 0;
+		message.groupIv = object.groupIv ?? void 0;
+		return message;
+	}
+};
+function createBaseOpenPage() {
+	return { params: {} };
+}
+const OpenPage = {
+	encode(message, writer = new BinaryWriter()) {
+		globalThis.Object.entries(message.params).forEach(([key, value]) => {
+			OpenPage_ParamsEntry.encode({
+				key,
+				value
+			}, writer.uint32(10).fork()).join();
+		});
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseOpenPage();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1: {
+						if (tag !== 10) break;
+						const entry1 = OpenPage_ParamsEntry.decode(reader, reader.uint32());
+						if (entry1.value !== void 0) message.params[entry1.key] = entry1.value;
+						continue;
+					}
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return { params: isObject(object.params) ? globalThis.Object.entries(object.params).reduce((acc, [key, value]) => {
+			globalThis.Object.defineProperty(acc, key, {
+				value: globalThis.String(value),
+				enumerable: true,
+				configurable: true,
+				writable: true
+			});
+			return acc;
+		}, {}) : {} };
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.params) {
+			const entries = globalThis.Object.entries(message.params);
+			if (entries.length > 0) {
+				obj.params = {};
+				entries.forEach(([k, v]) => {
+					obj.params[k] = v;
+				});
+			}
+		}
+		return obj;
+	},
+	create(base) {
+		return OpenPage.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseOpenPage();
+		message.params = globalThis.Object.entries(object.params ?? {}).reduce((acc, [key, value]) => {
+			if (value !== void 0) acc[key] = globalThis.String(value);
+			return acc;
+		}, {});
+		return message;
+	}
+};
+function createBaseOpenPage_ParamsEntry() {
+	return {
+		key: "",
+		value: ""
+	};
+}
+const OpenPage_ParamsEntry = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.key !== "") writer.uint32(10).string(message.key);
+		if (message.value !== "") writer.uint32(18).string(message.value);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseOpenPage_ParamsEntry();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.key = reader.string();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.value = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			key: isSet$3(object.key) ? globalThis.String(object.key) : "",
+			value: isSet$3(object.value) ? globalThis.String(object.value) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.key !== "") obj.key = message.key;
+		if (message.value !== "") obj.value = message.value;
+		return obj;
+	},
+	create(base) {
+		return OpenPage_ParamsEntry.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseOpenPage_ParamsEntry();
+		message.key = object.key ?? "";
+		message.value = object.value ?? "";
+		return message;
+	}
+};
+function createBaseShareVideo() {
+	return {
+		mediaId: void 0,
+		shareId: "",
+		miniAppFrom: void 0,
+		shareTarget: ""
+	};
+}
+const ShareVideo = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.mediaId !== void 0) writer.uint32(8).int64(message.mediaId);
+		if (message.shareId !== "") writer.uint32(18).string(message.shareId);
+		if (message.miniAppFrom !== void 0) writer.uint32(26).string(message.miniAppFrom);
+		if (message.shareTarget !== "") writer.uint32(34).string(message.shareTarget);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseShareVideo();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.mediaId = longToNumber$1(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.shareId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.miniAppFrom = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.shareTarget = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			mediaId: isSet$3(object.mediaId) ? globalThis.Number(object.mediaId) : void 0,
+			shareId: isSet$3(object.shareId) ? globalThis.String(object.shareId) : "",
+			miniAppFrom: isSet$3(object.miniAppFrom) ? globalThis.String(object.miniAppFrom) : void 0,
+			shareTarget: isSet$3(object.shareTarget) ? globalThis.String(object.shareTarget) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.mediaId !== void 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.shareId !== "") obj.shareId = message.shareId;
+		if (message.miniAppFrom !== void 0) obj.miniAppFrom = message.miniAppFrom;
+		if (message.shareTarget !== "") obj.shareTarget = message.shareTarget;
+		return obj;
+	},
+	create(base) {
+		return ShareVideo.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseShareVideo();
+		message.mediaId = object.mediaId ?? void 0;
+		message.shareId = object.shareId ?? "";
+		message.miniAppFrom = object.miniAppFrom ?? void 0;
+		message.shareTarget = object.shareTarget ?? "";
+		return message;
+	}
+};
+function createBaseReportMedia() {
+	return {
+		mediaId: 0,
+		reason: ""
+	};
+}
+const ReportMedia = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.mediaId !== 0) writer.uint32(8).int64(message.mediaId);
+		if (message.reason !== "") writer.uint32(18).string(message.reason);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseReportMedia();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.mediaId = longToNumber$1(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.reason = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			mediaId: isSet$3(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			reason: isSet$3(object.reason) ? globalThis.String(object.reason) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.mediaId !== 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.reason !== "") obj.reason = message.reason;
+		return obj;
+	},
+	create(base) {
+		return ReportMedia.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseReportMedia();
+		message.mediaId = object.mediaId ?? 0;
+		message.reason = object.reason ?? "";
+		return message;
+	}
+};
+function longToNumber$1(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
+function isObject(value) {
+	return typeof value === "object" && value !== null;
+}
+function isSet$3(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/models/client/log/video.ts
+function createBaseVideoView() {
+	return { mediaId: 0 };
+}
+const VideoView = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.mediaId !== 0) writer.uint32(8).int64(message.mediaId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseVideoView();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.mediaId = longToNumber(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return { mediaId: isSet$2(object.mediaId) ? globalThis.Number(object.mediaId) : 0 };
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.mediaId !== 0) obj.mediaId = Math.round(message.mediaId);
+		return obj;
+	},
+	create(base) {
+		return VideoView.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseVideoView();
+		message.mediaId = object.mediaId ?? 0;
+		return message;
+	}
+};
+function createBaseVideoViewFinish() {
+	return {
+		mediaId: 0,
+		complete: false
+	};
+}
+const VideoViewFinish = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.mediaId !== 0) writer.uint32(8).int64(message.mediaId);
+		if (message.complete !== false) writer.uint32(16).bool(message.complete);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseVideoViewFinish();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.mediaId = longToNumber(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.complete = reader.bool();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			mediaId: isSet$2(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			complete: isSet$2(object.complete) ? globalThis.Boolean(object.complete) : false
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.mediaId !== 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.complete !== false) obj.complete = message.complete;
+		return obj;
+	},
+	create(base) {
+		return VideoViewFinish.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseVideoViewFinish();
+		message.mediaId = object.mediaId ?? 0;
+		message.complete = object.complete ?? false;
+		return message;
+	}
+};
+function longToNumber(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
+function isSet$2(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/models/client/log/combined.ts
+function createBaseCombinedLog() {
+	return {
+		base: void 0,
+		openApp: void 0,
+		openPage: void 0,
+		videoView: void 0,
+		videoViewFinish: void 0,
+		shareVideo: void 0,
+		reportMedia: void 0
+	};
+}
+const CombinedLog = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.base !== void 0) BaseLogInfo.encode(message.base, writer.uint32(10).fork()).join();
+		if (message.openApp !== void 0) OpenApp.encode(message.openApp, writer.uint32(90).fork()).join();
+		if (message.openPage !== void 0) OpenPage.encode(message.openPage, writer.uint32(98).fork()).join();
+		if (message.videoView !== void 0) VideoView.encode(message.videoView, writer.uint32(106).fork()).join();
+		if (message.videoViewFinish !== void 0) VideoViewFinish.encode(message.videoViewFinish, writer.uint32(114).fork()).join();
+		if (message.shareVideo !== void 0) ShareVideo.encode(message.shareVideo, writer.uint32(122).fork()).join();
+		if (message.reportMedia !== void 0) ReportMedia.encode(message.reportMedia, writer.uint32(130).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCombinedLog();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.base = BaseLogInfo.decode(reader, reader.uint32());
+						continue;
+					case 11:
+						if (tag !== 90) break;
+						message.openApp = OpenApp.decode(reader, reader.uint32());
+						continue;
+					case 12:
+						if (tag !== 98) break;
+						message.openPage = OpenPage.decode(reader, reader.uint32());
+						continue;
+					case 13:
+						if (tag !== 106) break;
+						message.videoView = VideoView.decode(reader, reader.uint32());
+						continue;
+					case 14:
+						if (tag !== 114) break;
+						message.videoViewFinish = VideoViewFinish.decode(reader, reader.uint32());
+						continue;
+					case 15:
+						if (tag !== 122) break;
+						message.shareVideo = ShareVideo.decode(reader, reader.uint32());
+						continue;
+					case 16:
+						if (tag !== 130) break;
+						message.reportMedia = ReportMedia.decode(reader, reader.uint32());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			base: isSet$1(object.base) ? BaseLogInfo.fromJSON(object.base) : void 0,
+			openApp: isSet$1(object.openApp) ? OpenApp.fromJSON(object.openApp) : void 0,
+			openPage: isSet$1(object.openPage) ? OpenPage.fromJSON(object.openPage) : void 0,
+			videoView: isSet$1(object.videoView) ? VideoView.fromJSON(object.videoView) : void 0,
+			videoViewFinish: isSet$1(object.videoViewFinish) ? VideoViewFinish.fromJSON(object.videoViewFinish) : void 0,
+			shareVideo: isSet$1(object.shareVideo) ? ShareVideo.fromJSON(object.shareVideo) : void 0,
+			reportMedia: isSet$1(object.reportMedia) ? ReportMedia.fromJSON(object.reportMedia) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.base !== void 0) obj.base = BaseLogInfo.toJSON(message.base);
+		if (message.openApp !== void 0) obj.openApp = OpenApp.toJSON(message.openApp);
+		if (message.openPage !== void 0) obj.openPage = OpenPage.toJSON(message.openPage);
+		if (message.videoView !== void 0) obj.videoView = VideoView.toJSON(message.videoView);
+		if (message.videoViewFinish !== void 0) obj.videoViewFinish = VideoViewFinish.toJSON(message.videoViewFinish);
+		if (message.shareVideo !== void 0) obj.shareVideo = ShareVideo.toJSON(message.shareVideo);
+		if (message.reportMedia !== void 0) obj.reportMedia = ReportMedia.toJSON(message.reportMedia);
+		return obj;
+	},
+	create(base) {
+		return CombinedLog.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCombinedLog();
+		message.base = object.base !== void 0 && object.base !== null ? BaseLogInfo.fromPartial(object.base) : void 0;
+		message.openApp = object.openApp !== void 0 && object.openApp !== null ? OpenApp.fromPartial(object.openApp) : void 0;
+		message.openPage = object.openPage !== void 0 && object.openPage !== null ? OpenPage.fromPartial(object.openPage) : void 0;
+		message.videoView = object.videoView !== void 0 && object.videoView !== null ? VideoView.fromPartial(object.videoView) : void 0;
+		message.videoViewFinish = object.videoViewFinish !== void 0 && object.videoViewFinish !== null ? VideoViewFinish.fromPartial(object.videoViewFinish) : void 0;
+		message.shareVideo = object.shareVideo !== void 0 && object.shareVideo !== null ? ShareVideo.fromPartial(object.shareVideo) : void 0;
+		message.reportMedia = object.reportMedia !== void 0 && object.reportMedia !== null ? ReportMedia.fromPartial(object.reportMedia) : void 0;
+		return message;
+	}
+};
+function createBaseBaseLogInfo() {
+	return {
+		openId: "",
+		session: "",
+		page: ""
+	};
+}
+const BaseLogInfo = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.openId !== "") writer.uint32(10).string(message.openId);
+		if (message.session !== "") writer.uint32(18).string(message.session);
+		if (message.page !== "") writer.uint32(26).string(message.page);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseBaseLogInfo();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.openId = reader.string();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.session = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.page = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			session: isSet$1(object.session) ? globalThis.String(object.session) : "",
+			page: isSet$1(object.page) ? globalThis.String(object.page) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.session !== "") obj.session = message.session;
+		if (message.page !== "") obj.page = message.page;
+		return obj;
+	},
+	create(base) {
+		return BaseLogInfo.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseBaseLogInfo();
+		message.openId = object.openId ?? "";
+		message.session = object.session ?? "";
+		message.page = object.page ?? "";
+		return message;
+	}
+};
+function isSet$1(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/models/client/api/report.ts
+function createBaseLogReportRequest() {
+	return {
+		common: void 0,
+		batch: []
+	};
+}
+const LogReportRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.batch) CombinedLog.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseLogReportRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.batch.push(CombinedLog.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			batch: globalThis.Array.isArray(object?.batch) ? object.batch.map((e) => CombinedLog.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.batch?.length) obj.batch = message.batch.map((e) => CombinedLog.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return LogReportRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseLogReportRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.batch = object.batch?.map((e) => CombinedLog.fromPartial(e)) || [];
+		return message;
+	}
+};
+function isSet(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/apis/api_report_log.ts
+var ApiReportLog = class extends BaseApi {
+	async reportOneLog(gen) {
+		const batch = gen({
+			openId: await this.authedOpenId(),
+			session: this.session,
+			page: this.cachedPath
+		});
+		await this.reportLog({ batch: await batch });
+	}
+	reportLog({ batch }) {
+		return this.invokeProtoApi({
+			method: "PUT",
+			path: "/media-hub/report/log",
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				batch
+			},
+			requestMeta: LogReportRequest,
+			responseMeta: CommonResponseData,
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
+	}
+};
+//#endregion
+//#region src/apis/api_auth.ts
+var ApiAuth = class extends BaseApi {
+	async userSessionCheck({ openId }) {
+		const { needLogin, shareMark } = await this.invokeProtoApi({
+			path: "/media-hub/user/session-check",
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId
+			},
+			requestMeta: SessionCheckRequest,
+			responseMeta: SessionCheckResponse,
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({
+					needLogin: response.needLogin,
+					shareMark: response.shareMark
+				})
+			}
+		});
+		this.updateCachedShareMark(shareMark);
+		return { needLogin };
+	}
+	async userLogin({ code }) {
+		const { openId, shareMark } = await this.invokeProtoApi({
+			path: "/media-hub/user/login",
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				code
+			},
+			requestMeta: LoginRequest,
+			responseMeta: LoginResponse,
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({
+					openId: response.openId,
+					shareMark: response.shareMark
+				})
+			}
+		});
+		this.updateCachedShareMark(shareMark);
+		this.updateCachedOpenId(openId);
+	}
+};
+//#endregion
+//#region src/index.ts
+let textEncodingConfigured = false;
+var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt) {
+	constructor(appId, base, network) {
+		if (!textEncodingConfigured) Api.configureCustomUtf8();
+		super(appId, base, network);
+	}
+	static configureLegacyUtf8() {
+		textEncodingConfigured = true;
+		configureTextEncoding(new LegacyUtf8TextEncoding());
+	}
+	static configureCustomUtf8() {
+		textEncodingConfigured = true;
+		configureTextEncoding(new Utf8TextEncoding());
+	}
+	static createFetch(appId, base) {
+		return new Api(appId, base, new FetchNetwork());
+	}
+	static createWx(appId, base) {
+		return new Api(appId, base, new WxNetwork());
+	}
+};
+//#endregion
+export { Api };
+
+//# sourceMappingURL=index.js.map
