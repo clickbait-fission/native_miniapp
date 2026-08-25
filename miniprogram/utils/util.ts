@@ -4,3 +4,9 @@ export async function sleep(seconds?: number) {
     }
     return new Promise(resolve => setTimeout(resolve, Math.round(seconds * 1000)));
 }
+
+export function computeVars() {
+    const menuButton = wx.getMenuButtonBoundingClientRect();
+    const windowInfo = wx.getWindowInfo();
+    return `--safe-top: ${Math.max(menuButton.top, windowInfo.safeArea.top)}px; --safe-bottom: ${windowInfo.windowHeight - windowInfo.safeArea.bottom}px;`;
+}

@@ -1,12 +1,10 @@
 import {IAppOption} from "../../../typings";
 import {Media} from "../../api";
 import {kDev} from "../../utils/consts";
-import {sleep} from "../../utils/util";
+import {computeVars, sleep} from "../../utils/util";
 
 const app = getApp<IAppOption>();
 const page = '/feed';
-
-type OptMedia = Media | null;
 
 /** swiper固定展示的swiper-item个数 */
 const kSpanSize = 5;
@@ -19,11 +17,8 @@ function initData(): Media[] {
     return [];
 }
 
-function initMedias(): OptMedia[] {
-    return [null, null, null, null, null];
-}
-
 class MediaInSpan {
+    index: number = 0;
     media: Media | null = null;
     active: boolean = false;
     nearActive: boolean = false;
@@ -32,7 +27,9 @@ class MediaInSpan {
 function initSpanData() {
     const data: MediaInSpan[] = [];
     for (let i = 0; i < kSpanSize; i++) {
-        data.push(new MediaInSpan());
+        const media = new MediaInSpan();
+        media.index = i;
+        data.push(media);
     }
     return data;
 }
@@ -79,12 +76,12 @@ class RotateSpan {
         return this.dataOffset + kSpanHalf;
     }
 
-    get canMovePositive(): boolean {
-        // todo: 当前视频的下一个视频不为null返回true
+    get canMoveNegative(): boolean {
+        return this.span[(this.rotateOffset + 1) % kSpanSize].media != null;
     }
 
-    get canMoveNegative(): boolean {
-        // todo: 当前视频不是第一个视频则返回true
+    get canMovePositive(): boolean {
+        return this.dataOffset > 0;
     }
 
     get direction() {
@@ -99,6 +96,37 @@ class RotateSpan {
         }
         // unreachable
         return 'none';
+    }
+
+    get hasMedias() {
+        for (let i = 0; i < kSpanSize; i++) {
+            if (this.span[i].media != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    get keys() {
+        const keys: (number | undefined)[] = [];
+        for (let i = 0; i < kSpanSize; i++) {
+            keys.push(this.span[i].media?.id);
+        }
+        return keys;
+    }
+
+    matchKeys(keys: (number | undefined)[]) {
+        if (keys.length != kSpanSize) {
+            return false;
+        }
+
+        for (let i = 0; i < kSpanSize; i++) {
+            if (this.span[i].index !== keys[i]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     move(step: number) {
@@ -145,15 +173,26 @@ Component({
         _skReportPromise: null as Promise<void> | null,
         direction: 'positive',
         hasMedias: false,
-        medias: initMedias(),
-        _span: new RotateSpan(),
+        medias: null as MediaInSpan[] | null,
+        isEmpty: false,
+        _span: null as RotateSpan | null,
         _data: initData(),
         _fetching: false,
         _end: false,
+        _keys: [] as (number|undefined)[],
+        vars: '',
     },
     lifetimes: {
+        created() {
+            this.data._span = new RotateSpan();
+            this.data._data = initData();
+        },
         attached() {
             this.data._active = true;
+            this.setData({
+                medias: this.data._span!.span,
+                vars: computeVars(),
+            });
             this.checkFetchMore();
         },
         detached() {
@@ -173,10 +212,15 @@ Component({
                 path: page,
             });
         },
+        resize() {
+            this.setData({
+                vars: computeVars(),
+            });
+        },
     },
     methods: {
         onSwiperChange(event: WechatMiniprogram.SwiperChange) {
-            const span = this.data._span;
+            const span = this.data._span!;
 
             let step = event.detail.current - span.spanActiveIndex;
             if (step > kSpanHalf) {
@@ -193,44 +237,45 @@ Component({
             this.checkFetchMore();
         },
         sync() {
-            const span = this.data._span;
-            let hasUpdate = span.direction != this.data.direction;
-            if (!hasUpdate) {
-                for (let i = 0; i < kSpanSize; i++) {
-                    if (this.data.medias[i]?.id === span.span[i].media?.id) {
-                        continue;
-                    }
-                    hasUpdate = true;
-                    break;
-                }
+            if (kDev) {
+                console.log('feed.sync', this.data);
             }
 
+            const span = this.data._span!;
+            const direction = span.direction;
+            const isEmpty = !this.data._fetching && this.data._end && this.data._data.length == 0;
+            const hasMedias = span.hasMedias;
+
+            let hasUpdate = this.data.medias !== span.span
+                || this.data.direction != direction
+                || this.data.hasMedias != hasMedias
+                || this.data.isEmpty != isEmpty
+                || !span.matchKeys(this.data._keys);
             if (!hasUpdate) {
                 return;
             }
 
-            let newMedias = [];
-            let hasMedias = false;
-            for (let i = 0; i < kSpanSize; i++) {
-                hasMedias ||= span.span[i].media != null;
-                newMedias.push(span.span[i].media);
-            }
-
             if (hasUpdate) {
-                this.setData({
+                const patch = {
                     hasMedias,
-                    medias: newMedias,
-                    direction: span.direction,
-                });
+                    isEmpty,
+                    medias: span.span,
+                    direction,
+                    _keys: span.keys,
+                };
+                if (kDev) {
+                    console.log('feed.patch', patch);
+                }
+                this.setData(patch);
             }
         },
         async checkFetchMore() {
-            if (!this.data._active || this.data._fetching || this.data._end || this.data._span.spanEnd < (this.data._data.length - kPrefetchCount)) {
+            if (!this.data._active || this.data._fetching || this.data._end || this.data._span!.spanEnd < (this.data._data.length - kPrefetchCount)) {
                 return;
             }
 
             this.data._fetching = true;
-            while (this.data._active && !this.data._end && this.data._span.spanEnd >= (this.data._data.length - kSpanHalf)) {
+            while (this.data._active && !this.data._end && this.data._span!.spanEnd >= (this.data._data.length - kSpanHalf)) {
                 let chunk: Media[];
                 try {
                     if (kDev) {
@@ -254,10 +299,11 @@ Component({
                 }
 
                 this.data._data.push(...chunk);
-                this.data._span.pickData(this.data._data);
+                this.data._span!.pickData(this.data._data);
                 this.sync();
             }
             this.data._fetching = false;
+            this.sync();
         },
     },
 })

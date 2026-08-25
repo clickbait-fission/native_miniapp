@@ -30,7 +30,10 @@
 }
 
 .tab {
+  box-sizing: content-box;
   height: 80px;
+  padding-top: 12px;
+  padding-bottom: var(--safe-bottom);
 
   display: flex;
   flex-direction: row;

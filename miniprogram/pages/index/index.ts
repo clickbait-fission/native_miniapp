@@ -1,4 +1,5 @@
 import {IAppOption} from "../../../typings";
+import {computeVars} from "../../utils/util";
 
 const app = getApp<IAppOption>();
 
@@ -45,12 +46,6 @@ function initTabConfig(): TabConfig[] {
     ];
 }
 
-function computeVars() {
-    const menuButton = wx.getMenuButtonBoundingClientRect();
-    const windowInfo = wx.getWindowInfo();
-    return `--safe-top: ${menuButton.top}px; --safe-bottom: ${windowInfo.windowHeight - windowInfo.safeArea.bottom}px;`;
-}
-
 Component({
     options: {
         pureDataPattern: /^_/,
@@ -60,10 +55,13 @@ Component({
         _pageViewReported: false,
         currentTab: initTab(),
         tabs: initTabConfig(),
-        vars: computeVars(),
+        vars: '',
     },
     pageLifetimes: {
         show() {
+            this.setData({
+                vars: computeVars(),
+            });
             this.reportPageViewOnce();
             this.reportTabView();
         },

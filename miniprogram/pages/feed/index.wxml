@@ -1,19 +1,19 @@
-<view wx:if="{{ !hasMedias }}" class="container hint-container">
-    <spin-anim />
+<view wx:if="{{ !hasMedias }}" class="container hint-container" style="{{vars}}">
+    <spin-anim wx:if="{{!isEmpty}}" />
+    <text wx:if="{{isEmpty}}">当前无视频内容</text>
 </view>
 
-<swiper wx:if="{{ hasMedias }}" class="container" circular="true" vertical="true" indicator-dots="false" direction="{{direction}}" bind:change="onSwiperChange">
-    <swiper-item wx:for="{{medias}}">
-        <view wx:if="{{item}}" class="card">
-            <image class="cover" src="{{item.cover}}" mode="aspectFill"/>
+<swiper wx:if="{{ hasMedias }}" class="container" style="{{vars}}"
+        circular="true" vertical="true" indicator-dots="false"
+        direction="{{direction}}" bind:change="onSwiperChange">
+    <swiper-item wx:for="{{medias}}" wx:key="index">
+        <view wx:if="{{item.media != null}}" class="card">
+            <image class="cover" src="{{item.media.cover}}" mode="aspectFill"/>
             <view class="mask"/>
             <view class="info">
-                <text class="title">{{item.title}}</text>
-                <text class="meta">{{item.viewCount}} 次播放</text>
+                <text class="title">{{item.key}} {{item.media.title}}</text>
+                <text class="meta">{{item.media.viewCount}} 次播放</text>
             </view>
-        </view>
-        <view wx:else class="card empty">
-            <text>加载中...</text>
         </view>
     </swiper-item>
 </swiper>
