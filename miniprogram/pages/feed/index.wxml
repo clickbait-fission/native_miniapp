@@ -1,5 +1,19 @@
-<swiper class="container" circular="true" vertical="true" indicator-dots="false" direction="{{direction}}">
+<view wx:if="{{ !hasMedias }}" class="container hint-container">
+    <spin-anim />
+</view>
+
+<swiper wx:if="{{ hasMedias }}" class="container" circular="true" vertical="true" indicator-dots="false" direction="{{direction}}" bind:change="onSwiperChange">
     <swiper-item wx:for="{{medias}}">
-        <!-- todo: 视频卡片 -->
+        <view wx:if="{{item}}" class="card">
+            <image class="cover" src="{{item.cover}}" mode="aspectFill"/>
+            <view class="mask"/>
+            <view class="info">
+                <text class="title">{{item.title}}</text>
+                <text class="meta">{{item.viewCount}} 次播放</text>
+            </view>
+        </view>
+        <view wx:else class="card empty">
+            <text>加载中...</text>
+        </view>
     </swiper-item>
 </swiper>
