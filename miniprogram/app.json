@@ -3,7 +3,9 @@
     "pages/index/index",
     "pages/feed/index",
     "pages/web/index",
-    "pages/user/index"
+    "pages/user/index",
+    "pages/license/privacy",
+    "pages/license/term_of_use"
   ],
   "window": {
     "navigationStyle": "custom",
