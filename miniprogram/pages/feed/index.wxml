@@ -16,13 +16,14 @@
                    src="{{item.media.url}}"
                    autoplay="{{true}}"
                    loop="{{true}}"
-                   play-btn-position="center"
                    show-progress="{{true}}"
                    show-fullscreen-btn="{{true}}"
                    bind:tap="onTapVideo"
                    bind:play="onVideoPlay"
                    bind:pause="onVideoPause"
-                   data-id="{{item.id}}"/>
+                   bind:ended="onVideoFinish"
+                   data-id="{{item.id}}"
+                   data-media-id="{{item.media.id}}"/>
             <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
             <view class="actions">
                 <view class="favorite">

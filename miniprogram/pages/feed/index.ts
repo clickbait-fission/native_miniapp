@@ -190,6 +190,7 @@ Component({
         _keys: [] as (number | undefined)[],
         vars: '',
         _playingId: '',
+        _finishReported: false,
     },
     lifetimes: {
         created() {
@@ -346,13 +347,69 @@ Component({
             }
         },
         onVideoPlay(event: WechatMiniprogram.BaseEvent) {
-            this.data._playingId = event.target.dataset.id as string;
+            const id = event.target.dataset.id as string;
+            if (this.data._playingId != id) {
+                const previousMedia = this.mediaIdOf(this.data._playingId);
+                if (previousMedia != null && !this.data._finishReported) {
+                    app.api.reportOneLog((base) => [
+                        {
+                            base,
+                            videoViewFinish: {
+                                mediaId: previousMedia,
+                                complete: false,
+                            },
+                        }
+                    ]);
+                }
+
+                this.data._playingId = id;
+                this.data._finishReported = false;
+
+                const mediaId = this.mediaIdOf(id);
+                if (mediaId != null) {
+                    app.api.reportOneLog((base) => [
+                        {
+                            base,
+                            videoView: {
+                                mediaId,
+                            },
+                        }
+                    ]);
+                }
+            }
         },
         onVideoPause(event: WechatMiniprogram.BaseEvent) {
-            const id = event.target.dataset.id as string;
+            const id = event.target.dataset.mediaId as string;
             if (this.data._playingId == id) {
                 this.data._playingId = '';
             }
+        },
+        onVideoFinish(event: WechatMiniprogram.BaseEvent) {
+            const id = event.target.dataset.mediaId as string;
+            if (!this.data._finishReported) {
+                this.data._finishReported = true;
+
+                const mediaId = this.mediaIdOf(id);
+                if (mediaId != null) {
+                    app.api.reportOneLog((base) => [
+                        {
+                            base,
+                            videoViewFinish: {
+                                mediaId,
+                                complete: true,
+                            },
+                        }
+                    ]);
+                }
+            }
+        },
+        mediaIdOf(id: string) {
+            for (let mediaInSpan of this.data._span!.span) {
+                if (mediaInSpan.id == id) {
+                    return mediaInSpan?.media?.id;
+                }
+            }
+            return undefined;
         },
         onTapBack() {
             wx.navigateBack();
