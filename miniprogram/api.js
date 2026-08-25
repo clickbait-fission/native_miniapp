@@ -2274,7 +2274,6 @@ var BaseSessionManagement = class {
 		if (this.cachedPath == path && paramsEq(this.cachedParams, trimParams)) return;
 		this.cachedPath = path;
 		this.cachedParams = trimParams;
-		console.log("setCurrentPath", path, trimParams);
 		this.reportOneLog((base) => [{
 			base,
 			openPage: { params: trimParams }
@@ -2337,9 +2336,7 @@ var BaseSessionManagement = class {
 		const { needLogin } = await (async (openId) => {
 			try {
 				if (openId.length > 0) return await this.userSessionCheck({ openId });
-			} catch (e) {
-				console.log("user session check", e);
-			}
+			} catch (e) {}
 			return { needLogin: true };
 		})(this.cacheOpenId.value.trim());
 		if (!needLogin) return;
@@ -2348,8 +2345,7 @@ var BaseSessionManagement = class {
 			await this.userLogin({ code: response.code });
 			return;
 		} catch (e) {
-			console.log("do user login", e);
-			throw e;
+			await new Promise((resolve) => setTimeout(resolve, 1e3));
 		}
 	}
 	updateAppInfo() {
@@ -2383,7 +2379,6 @@ var BaseSessionManagement = class {
 	}
 	updateOpenApp(newOpenApp) {
 		if (this.openApp != null && this.openApp?.path == newOpenApp.path && this.openApp?.scene == newOpenApp.scene) return;
-		console.log("updateOpenApp", newOpenApp, this.openApp);
 		this.openApp = newOpenApp;
 		this.reportOneLog((base) => [{
 			base,
@@ -2406,9 +2401,7 @@ var CachedString = class {
 	get value() {
 		if (this.cache == null) try {
 			this.cache = wx.getStorageSync(this.key);
-		} catch (e) {
-			console.log(`get ${this.key} in cache`, e);
-		}
+		} catch (e) {}
 		return this.cache ?? this.empty;
 	}
 	set value(v) {
@@ -2534,7 +2527,6 @@ var BaseApi = class extends BaseSessionManagement {
 		this.network = network;
 	}
 	async invokeProtoApi(options) {
-		console.log("invokeProtoApi", options.path, options.params, options.requestBody);
 		const response = await this.network.invokeHttp({
 			method: options.method ?? "POST",
 			uri: composeUri({
@@ -2545,9 +2537,8 @@ var BaseApi = class extends BaseSessionManagement {
 			headers: { "Content-Type": "application/protobuf" },
 			requestBody: options.requestMeta.encode(options.requestBody, new BinaryWriter((text) => utf8Encoding.encodeUtf8(text))).finish()
 		});
-		const accessId = response.headers["access-id"] ?? "unknown access id";
+		response.headers["access-id"];
 		const body = options.responseMeta.decode(new BinaryReader(response.body, (bytes) => utf8Encoding.decodeUtf8(bytes)));
-		console.log("invokeProtoApi.ok", options.path, options.params, options.requestBody, body, accessId);
 		checkApiResponse(options.extractor.commonOf(body));
 		return options.extractor.bodyOf(body);
 	}
@@ -4726,7 +4717,6 @@ var ApiReportLog = class extends BaseApi {
 		await this.reportLog({ batch: await batch });
 	}
 	reportLog({ batch }) {
-		console.log("reportLog", batch);
 		return this.invokeProtoApi({
 			method: "PUT",
 			path: "/media-hub/report/log",
@@ -6767,7 +6757,6 @@ function decodeURIShareQuery(share) {
 		const text = utf8Encoding.decodeUtf8(bin);
 		return JSON.parse(text);
 	} catch (err) {
-		console.log("parse share", err);
 		return;
 	}
 }

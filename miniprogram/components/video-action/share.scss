@@ -27,7 +27,15 @@
 
   .text {
     color: white;
-    font-size: 20px;
     font-weight: 600;
+    font-size: 14px;
+
+    @media (min-width: 300px) {
+      font-size: 16px;
+    }
+
+    @media (min-width: 375px) {
+      font-size: 20px;
+    }
   }
 }

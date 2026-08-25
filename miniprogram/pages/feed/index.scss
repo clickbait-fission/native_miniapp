@@ -54,44 +54,18 @@
     flex-direction: row;
     align-items: center;
 
+    .gap {
+      flex: 1;
+      min-width: 12px;
+    }
+
     .favorite {
       width: 42px;
       height: 42px;
     }
 
-    .gap {
-      flex: 1;
-    }
-
     .share-gap {
       width: 12px;
-    }
-  }
-}
-
-@media (max-width: 375px) {
-  .card {
-    .actions {
-      .gap {
-        width: 0;
-      }
-      .share {
-        flex: 1;
-      }
-    }
-  }
-}
-
-@media (min-width: 375px) {
-  .card {
-    .actions {
-      .gap {
-        flex: 1;
-      }
-
-      .share {
-        width: 150px;
-      }
     }
   }
 }

@@ -37,6 +37,9 @@
       .name {
         width: 100%;
         font-size: 20px;
+        @media (max-width: 375px) {
+          font-size: 16px;
+        }
 
         .nickname {
           font-weight: 500;
@@ -52,6 +55,10 @@
       .statistics {
         font-size: 18px;
         font-weight: lighter;
+
+        @media (max-width: 375px) {
+          font-size: 14px;
+        }
       }
     }
   }
