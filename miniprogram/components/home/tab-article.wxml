@@ -11,7 +11,7 @@
         type="custom"
         enhanced="{{true}}"
         show-scrollbar="{{false}}">
-    <view wx:for="{{articles}}" class="article">
+    <view wx:for="{{articles}}" wx:key="key" class="article" bind:tap="onTapArticle" data-url="{{item.address}}">
         <image class="cover" mode="aspectFill" src="{{item.image}}"/>
         <view class="content">
             <text class="title">{{item.title}}</text>

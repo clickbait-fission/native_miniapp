@@ -1,10 +1,16 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/feed/index",
+    "pages/web/index",
+    "pages/user/index"
   ],
   "window": {
+    "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
-    "navigationStyle": "custom"
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#ffffff",
+    "backgroundTextStyle": "dark"
   },
   "resizable": true,
   "style": "v2",

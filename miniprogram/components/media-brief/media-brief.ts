@@ -22,13 +22,13 @@ Component({
         async onTapVideo() {
             const media = this.properties.media as Media;
             await wx.navigateTo({
-                url: `/feed?top=${media.id}`,
+                url: `/pages/feed/index?top=${media.id}`,
             });
         },
         async onTapAuthor() {
             const media = this.properties.media as Media;
             await wx.navigateTo({
-                url: `/user/${media.ownerId}`,
+                url: `/pages/user/index?uid=${media.ownerId}`,
             });
         },
     }

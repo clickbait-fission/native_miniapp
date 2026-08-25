@@ -3,6 +3,8 @@ import {Article} from "../../api";
 import {sleep} from "../../utils/util";
 import {kDev} from "../../utils/consts";
 
+type BaseEvent = WechatMiniprogram.BaseEvent;
+
 const app = getApp<IAppOption>();
 
 Component({
@@ -13,7 +15,7 @@ Component({
         _active: false,
         fetched: false,
         fetching: false,
-        articles: [] as Article[],
+        articles: [] as (Article & { key: string })[],
     },
     lifetimes: {
         attached() {
@@ -52,14 +54,25 @@ Component({
                     continue;
                 }
 
+                const keyArticles = [];
+                for (let i = 0; i < articles.length; i++) {
+                    keyArticles.push({...articles[i], key: `$i`});
+                }
+
                 this.setData({
                     fetched: true,
-                    articles,
+                    articles: keyArticles,
                 });
             }
             this.setData({
                 fetching: false,
             });
-        }
-    }
+        },
+        async onTapArticle(event: BaseEvent) {
+            const url = `${event.currentTarget.dataset.url}`;
+            await wx.navigateTo({
+                url: `/pages/web/index?url=${encodeURIComponent(url)}`
+            });
+        },
+    },
 })
