@@ -2094,6 +2094,7 @@ var BaseSessionManagement = class {
 		this.cacheOpenId = new CachedString("current_open_id");
 		this.cacheShareMark = new CachedString("current_share_mark");
 		this.cachedPath = "unknown";
+		this.cachedParams = {};
 		this.cachedSceneId = -1;
 		this.appActive = true;
 		this.authCheck = Promise.reject("auth not init");
@@ -2128,8 +2129,9 @@ var BaseSessionManagement = class {
 			if (v == null) continue;
 			trimParams[k] = v;
 		}
-		if (this.cachedPath == path) return;
+		if (this.cachedPath == path && paramsEq(this.cachedParams, trimParams)) return;
 		this.cachedPath = path;
+		this.cachedParams = trimParams;
 		console.log("setCurrentPath", path, trimParams);
 		this.reportOneLog((base) => [{
 			base,
@@ -2244,6 +2246,12 @@ var BaseSessionManagement = class {
 		}]);
 	}
 };
+function paramsEq(x, y) {
+	const xKeys = Object.keys(x);
+	if (xKeys.length !== Object.keys(y).length) return false;
+	for (const k of xKeys) if (x[k] !== y[k]) return false;
+	return true;
+}
 var CachedString = class {
 	constructor(key, empty) {
 		this.key = key;

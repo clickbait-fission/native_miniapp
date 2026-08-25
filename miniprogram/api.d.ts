@@ -464,6 +464,7 @@ declare class BaseSessionManagement {
   private readonly cacheShareMark;
   readonly appId: number;
   protected cachedPath: string;
+  protected cachedParams: Record<string, string>;
   protected cachedSceneId: number;
   protected appActive: boolean;
   private authCheck;
