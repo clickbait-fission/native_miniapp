@@ -1,3 +1,10 @@
-<text>
-    is {{mediaJson()}}
-</text>
+<view class="root">
+    <view class="video" bind:tap="onTapVideo">
+        <image class="cover" src="{{cover}}" mode="aspectFill" />
+        <image class="play-icon" mode="aspectFit" src="/assets/play.svg" />
+    </view>
+    <view class="author" bind:tap="onTapAuthor">
+        <image class="avatar" src="{{avatar}}" mode="aspectFill" />
+        <text class="nickname">{{nickname}}</text>
+    </view>
+</view>

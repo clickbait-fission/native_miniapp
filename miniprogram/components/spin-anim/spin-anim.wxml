@@ -1,0 +1,3 @@
+<view class="anim" style="{{style}}">
+    <image class="image" mode="aspectFit" src="{{src}}" />
+</view>

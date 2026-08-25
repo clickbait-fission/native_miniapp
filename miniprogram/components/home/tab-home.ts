@@ -1,56 +1,53 @@
 import {Media} from "../../api";
+import {IAppOption} from "../../../typings";
+import {kDev} from "../../utils/consts";
 
 type ScrollViewScroll = WechatMiniprogram.ScrollViewScroll;
+
+const app = getApp<IAppOption>();
 
 Component({
     options: {
         pureDataPattern: /^_/,
     },
     properties: {
+        topId: {
+            type: Number,
+            optionalTypes: [null],
+            value: null,
+        },
         cardHeight: {
             type: Number,
-            value: 300,
-        }
+            value: 280,
+        },
     },
     data: {
-        medias: [
-            Media.create({id: 15}),
-            Media.create({id: 16}),
-            Media.create({id: 17}),
-            Media.create({id: 18}),
-            Media.create({id: 19}),
-            Media.create({id: 25}),
-            Media.create({id: 26}),
-            Media.create({id: 27}),
-            Media.create({id: 28}),
-            Media.create({id: 29}),
-            Media.create({id: 35}),
-            Media.create({id: 36}),
-            Media.create({id: 37}),
-            Media.create({id: 38}),
-            Media.create({id: 39}),
-            Media.create({id: 45}),
-            Media.create({id: 46}),
-            Media.create({id: 47}),
-            Media.create({id: 48}),
-            Media.create({id: 49}),
-        ] satisfies Media[],
-        shownMedias: [] as Media[],
+        medias: [] as (Media & { key: string })[],
+        shownMedias: [] as (Media & { key: string })[],
+        _active: false,
         _offset: 0,
         _height: 0,
         _currentStart: -1,
         _currentEnd: -1,
+        _fetching: false,
+        _end: false,
     },
     lifetimes: {
         attached() {
+            this.data._active = true;
             this.data._height = wx.getWindowInfo().windowHeight;
             this.updateLayout(true);
+            this.updateFetch();
         },
+        detached() {
+            this.data._active = false;
+        }
     },
     pageLifetimes: {
         resize(size) {
             this.data._height = size.size.windowHeight;
             this.updateLayout(true);
+            this.updateFetch();
         },
     },
     methods: {
@@ -71,29 +68,91 @@ Component({
             const bottomSpace = rootHeight - (end + 1) * this.properties.cardHeight;
             const shownMedias = this.data.medias.slice(start, end);
 
-            console.log('updateLayout', {
-                window: this.data._height,
-                rootHeight,
-                safeTop,
-                safeBottom,
-                start,
-                end,
-                topSpace,
-                bottomSpace,
-                shownMedias,
-            });
+            if (kDev) {
+                console.log('updateLayout', {
+                    window: this.data._height,
+                    rootHeight,
+                    safeTop,
+                    safeBottom,
+                    start,
+                    end,
+                    topSpace,
+                    bottomSpace,
+                    shownMedias,
+                });
+            }
 
             this.setData({
                 dynamicStyle: `--card-height:${this.properties.cardHeight}px;--root-height:${rootHeight}px;--top-space:${topSpace}px;--bottom-space:${bottomSpace}px;`,
                 shownMedias,
             });
         },
+        updateFetch() {
+            const rootHeight = this.properties.cardHeight * this.data.medias.length;
+            if (kDev) {
+                console.log('updateFetch', {
+                    rootHeight,
+                    fetching: this.data._fetching,
+                    offset: this.data._offset,
+                });
+            }
+
+            if (this.data._fetching || this.data._end || !this.data._active || this.data._offset < rootHeight - this.data._height * 2) {
+                return;
+            }
+            this.data._fetching = true;
+            this.setData({
+                hint: '更多精彩视频加载中',
+            });
+
+            async function doFetch(topId: number | undefined) {
+                const openId = await app.api.authedOpenId();
+                return await app.api.recommendByRankScore({
+                    openId: openId,
+                    topId: topId ?? undefined,
+                });
+            }
+
+            doFetch(this.properties.topId)
+                .then((medias) => {
+                    this.data._fetching = false;
+
+                    if (medias.length == 0) {
+                        this.data._end = true;
+                        this.setData({
+                            hint: '没有更多啦',
+                        });
+                    } else {
+                        const newMedias = [...this.data.medias];
+                        for (let i = 0; i < medias.length; i++) {
+                            newMedias.push({...medias[i], key: `${newMedias.length}.${medias[i].id}`})
+                        }
+                        this.setData({
+                            medias: newMedias,
+                            hint: '',
+                        });
+                    }
+
+                    this.updateLayout(true);
+                    this.updateFetch();
+                })
+                .catch((err) => {
+                    this.data._fetching = false;
+                    if (kDev) {
+                        console.log('rank error', err);
+                    }
+                    setTimeout(() => {
+                        this.updateFetch();
+                    }, 1000);
+                });
+        },
         onScroll(event: ScrollViewScroll) {
-            if (Math.max(this.data._offset - event.detail.scrollTop) < this.properties.cardHeight) {
+            if (Math.abs(this.data._offset - event.detail.scrollTop) < this.properties.cardHeight) {
                 return;
             }
             this.data._offset = event.detail.scrollTop;
             this.updateLayout();
+            this.updateFetch();
         },
     }
 })

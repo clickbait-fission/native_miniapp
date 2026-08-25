@@ -1,32 +1,29 @@
 import {Api} from "./api";
 import {IAppOption} from "../typings";
+import {kApiBase, kAppId, kDev} from "./utils/consts";
 
 // app.ts
 App<IAppOption>({
     // dev
-    api: Api.createWx(3, "http://127.0.0.1:6001/api"),
+    api: Api.createWx(kAppId, kApiBase),
     // prod
     // api: Api.createWx(2, "http://127.0.0.1:6001/api"),
     onLaunch(opts) {
-        Api.configureCustomUtf8();
+        if (kDev) {
+            console.log('app.onLaunch');
+        }
         this.api.onLaunch({sceneId: opts.scene});
-        // 展示本地存储能力
-        const logs = wx.getStorageSync('logs') || []
-        logs.unshift(Date.now())
-        wx.setStorageSync('logs', logs)
-
-        // 登录
-        wx.login({
-            success: res => {
-                console.log(res.code)
-                // 发送 res.code 到后台换取 openId, sessionKey, unionId
-            },
-        })
     },
     onShow(opts) {
+        if (kDev) {
+            console.log('app.onShow');
+        }
         this.api.onShow({sceneId: opts.scene});
     },
     onHide() {
+        if (kDev) {
+            console.log('app.onHide');
+        }
         this.api.onHide();
     },
 })

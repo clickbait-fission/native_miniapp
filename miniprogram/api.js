@@ -1,126 +1,448 @@
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 //#endregion
-//#region src/compatible/utf8.ts
-var LegacyUtf8TextEncoding = class {
-	constructor() {}
-	checkUtf8() {
-		return true;
-	}
-	encodeUtf8(text) {
-		const bin = unescape(encodeURIComponent(text)).split("").map((val) => val.charCodeAt(0));
-		return Uint8Array.from(bin);
-	}
-	decodeUtf8(bytes) {
-		return decodeURIComponent(escape(String.fromCharCode(...bytes)));
-	}
-};
-var Utf8TextEncoding = class {
-	checkUtf8(text) {
-		const size = text.length;
-		for (let i = 0; i < size; i++) {
-			const codePoint = text.charCodeAt(i);
-			if (isASCII(codePoint)) continue;
-			if (inRange(codePoint, 128, 1114111)) continue;
-			return false;
-		}
-		return true;
-	}
-	encodeUtf8(text) {
-		const bytes = [];
-		for (let i = 0; i < text.length; ++i) encodeCodePoint(text.charCodeAt(i), bytes);
-		return Uint8Array.from(bytes);
-	}
-	decodeUtf8(bytes) {
-		let codePoints = [];
-		const decoder = new CodePointDecoder();
-		for (const byte of bytes) {
-			const codePoint = decoder.decode(byte);
-			if (codePoint != null) codePoints.push(codePoint);
-		}
-		decoder.end();
-		return String.fromCodePoint(...codePoints);
+//#region src/networks/fetch_implementation.ts
+var FetchNetwork = class {
+	async invokeHttp({ method, uri, headers = {}, requestBody }) {
+		const response = await fetch(uri, {
+			method,
+			headers: new Headers(headers),
+			body: requestBody == null ? null : new ReadableStream({ start(controller) {
+				controller.enqueue(requestBody);
+				controller.close();
+			} })
+		});
+		const responseHeaders = {};
+		response.headers.forEach((value, key) => {
+			responseHeaders[key] = value;
+		});
+		return {
+			status: response.status,
+			headers: responseHeaders,
+			body: await response.bytes()
+		};
 	}
 };
-function isASCII(value) {
-	return value >= 0 && value <= 127;
-}
-function inRange(value, min, max) {
-	return value >= min && value <= max;
-}
-function encodeCodePoint(codePoint, output) {
-	if (isASCII(codePoint)) {
-		output.push(codePoint);
-		return;
-	}
-	let appendCount;
-	let appendOffset;
-	if (inRange(codePoint, 128, 2047)) {
-		appendCount = 1;
-		appendOffset = 192;
-	} else if (inRange(codePoint, 2048, 65535)) {
-		appendCount = 2;
-		appendOffset = 224;
-	} else if (inRange(codePoint, 65536, 1114111)) {
-		appendCount = 3;
-		appendOffset = 240;
-	} else throw new Error("Could encode code point of text in utf-8");
-	output.push((codePoint >> 6 * appendCount) + appendOffset);
-	while (appendCount > 0) {
-		appendCount--;
-		const temp = codePoint >> 6 * appendCount;
-		output.push(128 | temp & 63);
-	}
-}
-var CodePointDecoder = class {
-	constructor() {
-		this.codePoint = 0;
-		this.bytesSeen = 0;
-		this.bytesNeeded = 0;
-		this.lowerBoundary = 128;
-		this.upperBoundary = 191;
-	}
-	decode(byte) {
-		if (this.bytesNeeded === 0) {
-			if (inRange(byte, 0, 127)) return byte;
-			else if (inRange(byte, 194, 223)) {
-				this.bytesNeeded = 1;
-				this.codePoint = byte & 31;
-			} else if (inRange(byte, 224, 239)) {
-				if (byte === 224) this.lowerBoundary = 160;
-				if (byte === 237) this.upperBoundary = 159;
-				this.bytesNeeded = 2;
-				this.codePoint = byte & 15;
-			} else if (inRange(byte, 240, 244)) {
-				if (byte === 240) this.lowerBoundary = 144;
-				if (byte === 244) this.upperBoundary = 143;
-				this.bytesNeeded = 3;
-				this.codePoint = byte & 7;
-			} else throw new Error(`Unexpected head byte ${byte}`);
-			return null;
-		}
-		if (!inRange(byte, this.lowerBoundary, this.upperBoundary)) {
-			this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
-			this.lowerBoundary = 128;
-			this.upperBoundary = 191;
-			throw new Error(`Unexpected byte mid ${byte} (expected ${this.lowerBoundary}, ${this.upperBoundary})`);
-		}
-		this.lowerBoundary = 128;
-		this.upperBoundary = 191;
-		this.codePoint = this.codePoint << 6 | byte & 63;
-		this.bytesSeen += 1;
-		if (this.bytesSeen !== this.bytesNeeded) return null;
-		const codePoint = this.codePoint;
-		this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
-		return codePoint;
-	}
-	end() {
-		if (this.bytesNeeded !== 0) {
-			this.bytesNeeded = 0;
-			throw new Error("Unexpected eof");
-		}
+//#endregion
+//#region src/networks/wx_implementation.ts
+var WxNetwork = class {
+	invokeHttp({ method, uri, headers = {}, requestBody }) {
+		const buf = requestBody?.buffer;
+		return new Promise((resolve, reject) => {
+			const opts = {
+				url: uri,
+				method,
+				header: headers,
+				responseType: "arraybuffer",
+				timeout: 5e3,
+				success: (res) => {
+					resolve({
+						status: res.statusCode,
+						headers: res.header,
+						body: new Uint8Array(res.data)
+					});
+				},
+				fail: (err) => {
+					reject(err);
+				}
+			};
+			if (buf != null) opts.data = buf;
+			wx.request(opts);
+		});
 	}
 };
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/util.js
+var require_util = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.flatten = exports.unique = exports.hardMixProtos = exports.nearestCommonProto = exports.protoChain = exports.copyProps = void 0;
+	/**
+	* Utility function that works like `Object.apply`, but copies getters and setters properly as well.  Additionally gives
+	* the option to exclude properties by name.
+	*/
+	const copyProps = (dest, src, exclude = []) => {
+		const props = Object.getOwnPropertyDescriptors(src);
+		for (let prop of exclude) delete props[prop];
+		Object.defineProperties(dest, props);
+	};
+	exports.copyProps = copyProps;
+	/**
+	* Returns the full chain of prototypes up until Object.prototype given a starting object.  The order of prototypes will
+	* be closest to farthest in the chain.
+	*/
+	const protoChain = (obj, currentChain = [obj]) => {
+		const proto = Object.getPrototypeOf(obj);
+		if (proto === null) return currentChain;
+		return (0, exports.protoChain)(proto, [...currentChain, proto]);
+	};
+	exports.protoChain = protoChain;
+	/**
+	* Identifies the nearest ancestor common to all the given objects in their prototype chains.  For most unrelated
+	* objects, this function should return Object.prototype.
+	*/
+	const nearestCommonProto = (...objs) => {
+		if (objs.length === 0) return void 0;
+		let commonProto = void 0;
+		const protoChains = objs.map((obj) => (0, exports.protoChain)(obj));
+		while (protoChains.every((protoChain) => protoChain.length > 0)) {
+			const protos = protoChains.map((protoChain) => protoChain.pop());
+			const potentialCommonProto = protos[0];
+			if (protos.every((proto) => proto === potentialCommonProto)) commonProto = potentialCommonProto;
+			else break;
+		}
+		return commonProto;
+	};
+	exports.nearestCommonProto = nearestCommonProto;
+	/**
+	* Creates a new prototype object that is a mixture of the given prototypes.  The mixing is achieved by first
+	* identifying the nearest common ancestor and using it as the prototype for a new object.  Then all properties/methods
+	* downstream of this prototype (ONLY downstream) are copied into the new object.
+	*
+	* The resulting prototype is more performant than softMixProtos(...), as well as ES5 compatible.  However, it's not as
+	* flexible as updates to the source prototypes aren't captured by the mixed result.  See softMixProtos for why you may
+	* want to use that instead.
+	*/
+	const hardMixProtos = (ingredients, constructor, exclude = []) => {
+		var _a;
+		const base = (_a = (0, exports.nearestCommonProto)(...ingredients)) !== null && _a !== void 0 ? _a : Object.prototype;
+		const mixedProto = Object.create(base);
+		const visitedProtos = (0, exports.protoChain)(base);
+		for (let prototype of ingredients) {
+			let protos = (0, exports.protoChain)(prototype);
+			for (let i = protos.length - 1; i >= 0; i--) {
+				let newProto = protos[i];
+				if (visitedProtos.indexOf(newProto) === -1) {
+					(0, exports.copyProps)(mixedProto, newProto, ["constructor", ...exclude]);
+					visitedProtos.push(newProto);
+				}
+			}
+		}
+		mixedProto.constructor = constructor;
+		return mixedProto;
+	};
+	exports.hardMixProtos = hardMixProtos;
+	const unique = (arr) => arr.filter((e, i) => arr.indexOf(e) == i);
+	exports.unique = unique;
+	const flatten = (arr) => arr.length === 0 ? [] : arr.length === 1 ? arr[0] : arr.reduce((a1, a2) => [...a1, ...a2]);
+	exports.flatten = flatten;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/proxy.js
+var require_proxy = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.softMixProtos = exports.proxyMix = exports.getIngredientWithProp = void 0;
+	const util_1 = require_util();
+	/**
+	* Finds the ingredient with the given prop, searching in reverse order and breadth-first if searching ingredient
+	* prototypes is required.
+	*/
+	const getIngredientWithProp = (prop, ingredients) => {
+		const protoChains = ingredients.map((ingredient) => (0, util_1.protoChain)(ingredient));
+		let protoDepth = 0;
+		let protosAreLeftToSearch = true;
+		while (protosAreLeftToSearch) {
+			protosAreLeftToSearch = false;
+			for (let i = ingredients.length - 1; i >= 0; i--) {
+				const searchTarget = protoChains[i][protoDepth];
+				if (searchTarget !== void 0 && searchTarget !== null) {
+					protosAreLeftToSearch = true;
+					if (Object.getOwnPropertyDescriptor(searchTarget, prop) != void 0) return protoChains[i][0];
+				}
+			}
+			protoDepth++;
+		}
+	};
+	exports.getIngredientWithProp = getIngredientWithProp;
+	/**
+	* "Mixes" ingredients by wrapping them in a Proxy.  The optional prototype argument allows the mixed object to sit
+	* downstream of an existing prototype chain.  Note that "properties" cannot be added, deleted, or modified.
+	*/
+	const proxyMix = (ingredients, prototype = Object.prototype) => new Proxy({}, {
+		getPrototypeOf() {
+			return prototype;
+		},
+		setPrototypeOf() {
+			throw Error("Cannot set prototype of Proxies created by ts-mixer");
+		},
+		getOwnPropertyDescriptor(_, prop) {
+			return Object.getOwnPropertyDescriptor((0, exports.getIngredientWithProp)(prop, ingredients) || {}, prop);
+		},
+		defineProperty() {
+			throw new Error("Cannot define new properties on Proxies created by ts-mixer");
+		},
+		has(_, prop) {
+			return (0, exports.getIngredientWithProp)(prop, ingredients) !== void 0 || prototype[prop] !== void 0;
+		},
+		get(_, prop) {
+			return ((0, exports.getIngredientWithProp)(prop, ingredients) || prototype)[prop];
+		},
+		set(_, prop, val) {
+			const ingredientWithProp = (0, exports.getIngredientWithProp)(prop, ingredients);
+			if (ingredientWithProp === void 0) throw new Error("Cannot set new properties on Proxies created by ts-mixer");
+			ingredientWithProp[prop] = val;
+			return true;
+		},
+		deleteProperty() {
+			throw new Error("Cannot delete properties on Proxies created by ts-mixer");
+		},
+		ownKeys() {
+			return ingredients.map(Object.getOwnPropertyNames).reduce((prev, curr) => curr.concat(prev.filter((key) => curr.indexOf(key) < 0)));
+		}
+	});
+	exports.proxyMix = proxyMix;
+	/**
+	* Creates a new proxy-prototype object that is a "soft" mixture of the given prototypes.  The mixing is achieved by
+	* proxying all property access to the ingredients.  This is not ES5 compatible and less performant.  However, any
+	* changes made to the source prototypes will be reflected in the proxy-prototype, which may be desirable.
+	*/
+	const softMixProtos = (ingredients, constructor) => (0, exports.proxyMix)([...ingredients, { constructor }]);
+	exports.softMixProtos = softMixProtos;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/settings.js
+var require_settings = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.settings = void 0;
+	exports.settings = {
+		initFunction: null,
+		staticsStrategy: "copy",
+		prototypeStrategy: "copy",
+		decoratorInheritance: "deep"
+	};
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/mixin-tracking.js
+var require_mixin_tracking = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.hasMixin = exports.registerMixins = exports.getMixinsForClass = void 0;
+	const util_1 = require_util();
+	const mixins = /* @__PURE__ */ new WeakMap();
+	const getMixinsForClass = (clazz) => mixins.get(clazz);
+	exports.getMixinsForClass = getMixinsForClass;
+	const registerMixins = (mixedClass, constituents) => mixins.set(mixedClass, constituents);
+	exports.registerMixins = registerMixins;
+	const hasMixin = (instance, mixin) => {
+		if (instance instanceof mixin) return true;
+		const constructor = instance.constructor;
+		const visited = /* @__PURE__ */ new Set();
+		let frontier = /* @__PURE__ */ new Set();
+		frontier.add(constructor);
+		while (frontier.size > 0) {
+			if (frontier.has(mixin)) return true;
+			frontier.forEach((item) => visited.add(item));
+			const newFrontier = /* @__PURE__ */ new Set();
+			frontier.forEach((item) => {
+				var _a;
+				const itemConstituents = (_a = mixins.get(item)) !== null && _a !== void 0 ? _a : (0, util_1.protoChain)(item.prototype).map((proto) => proto.constructor).filter((item) => item !== null);
+				if (itemConstituents) itemConstituents.forEach((constituent) => {
+					if (!visited.has(constituent) && !frontier.has(constituent)) newFrontier.add(constituent);
+				});
+			});
+			frontier = newFrontier;
+		}
+		return false;
+	};
+	exports.hasMixin = hasMixin;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/decorator.js
+var require_decorator = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.decorate = exports.getDecoratorsForClass = exports.directDecoratorSearch = exports.deepDecoratorSearch = void 0;
+	const util_1 = require_util();
+	const mixin_tracking_1 = require_mixin_tracking();
+	const mergeObjectsOfDecorators = (o1, o2) => {
+		var _a, _b;
+		const allKeys = (0, util_1.unique)([...Object.getOwnPropertyNames(o1), ...Object.getOwnPropertyNames(o2)]);
+		const mergedObject = {};
+		for (let key of allKeys) mergedObject[key] = (0, util_1.unique)([...(_a = o1 === null || o1 === void 0 ? void 0 : o1[key]) !== null && _a !== void 0 ? _a : [], ...(_b = o2 === null || o2 === void 0 ? void 0 : o2[key]) !== null && _b !== void 0 ? _b : []]);
+		return mergedObject;
+	};
+	const mergePropertyAndMethodDecorators = (d1, d2) => {
+		var _a, _b, _c, _d;
+		return {
+			property: mergeObjectsOfDecorators((_a = d1 === null || d1 === void 0 ? void 0 : d1.property) !== null && _a !== void 0 ? _a : {}, (_b = d2 === null || d2 === void 0 ? void 0 : d2.property) !== null && _b !== void 0 ? _b : {}),
+			method: mergeObjectsOfDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.method) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.method) !== null && _d !== void 0 ? _d : {})
+		};
+	};
+	const mergeDecorators = (d1, d2) => {
+		var _a, _b, _c, _d, _e, _f;
+		return {
+			class: (0, util_1.unique)([...(_a = d1 === null || d1 === void 0 ? void 0 : d1.class) !== null && _a !== void 0 ? _a : [], ...(_b = d2 === null || d2 === void 0 ? void 0 : d2.class) !== null && _b !== void 0 ? _b : []]),
+			static: mergePropertyAndMethodDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.static) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.static) !== null && _d !== void 0 ? _d : {}),
+			instance: mergePropertyAndMethodDecorators((_e = d1 === null || d1 === void 0 ? void 0 : d1.instance) !== null && _e !== void 0 ? _e : {}, (_f = d2 === null || d2 === void 0 ? void 0 : d2.instance) !== null && _f !== void 0 ? _f : {})
+		};
+	};
+	const decorators = /* @__PURE__ */ new Map();
+	const findAllConstituentClasses = (...classes) => {
+		var _a;
+		const allClasses = /* @__PURE__ */ new Set();
+		const frontier = /* @__PURE__ */ new Set([...classes]);
+		while (frontier.size > 0) for (let clazz of frontier) {
+			const protoChainClasses = (0, util_1.protoChain)(clazz.prototype).map((proto) => proto.constructor);
+			const mixinClasses = (_a = (0, mixin_tracking_1.getMixinsForClass)(clazz)) !== null && _a !== void 0 ? _a : [];
+			const newClasses = [...protoChainClasses, ...mixinClasses].filter((c) => !allClasses.has(c));
+			for (let newClass of newClasses) frontier.add(newClass);
+			allClasses.add(clazz);
+			frontier.delete(clazz);
+		}
+		return [...allClasses];
+	};
+	const deepDecoratorSearch = (...classes) => {
+		const decoratorsForClassChain = findAllConstituentClasses(...classes).map((clazz) => decorators.get(clazz)).filter((decorators) => !!decorators);
+		if (decoratorsForClassChain.length == 0) return {};
+		if (decoratorsForClassChain.length == 1) return decoratorsForClassChain[0];
+		return decoratorsForClassChain.reduce((d1, d2) => mergeDecorators(d1, d2));
+	};
+	exports.deepDecoratorSearch = deepDecoratorSearch;
+	const directDecoratorSearch = (...classes) => {
+		const classDecorators = classes.map((clazz) => (0, exports.getDecoratorsForClass)(clazz));
+		if (classDecorators.length === 0) return {};
+		if (classDecorators.length === 1) return classDecorators[0];
+		return classDecorators.reduce((d1, d2) => mergeDecorators(d1, d2));
+	};
+	exports.directDecoratorSearch = directDecoratorSearch;
+	const getDecoratorsForClass = (clazz) => {
+		let decoratorsForClass = decorators.get(clazz);
+		if (!decoratorsForClass) {
+			decoratorsForClass = {};
+			decorators.set(clazz, decoratorsForClass);
+		}
+		return decoratorsForClass;
+	};
+	exports.getDecoratorsForClass = getDecoratorsForClass;
+	const decorateClass = (decorator) => ((clazz) => {
+		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
+		let classDecorators = decoratorsForClass.class;
+		if (!classDecorators) {
+			classDecorators = [];
+			decoratorsForClass.class = classDecorators;
+		}
+		classDecorators.push(decorator);
+		return decorator(clazz);
+	});
+	const decorateMember = (decorator) => ((object, key, ...otherArgs) => {
+		var _a, _b, _c;
+		const decoratorTargetType = typeof object === "function" ? "static" : "instance";
+		const decoratorType = typeof object[key] === "function" ? "method" : "property";
+		const clazz = decoratorTargetType === "static" ? object : object.constructor;
+		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
+		const decoratorsForTargetType = (_a = decoratorsForClass === null || decoratorsForClass === void 0 ? void 0 : decoratorsForClass[decoratorTargetType]) !== null && _a !== void 0 ? _a : {};
+		decoratorsForClass[decoratorTargetType] = decoratorsForTargetType;
+		let decoratorsForType = (_b = decoratorsForTargetType === null || decoratorsForTargetType === void 0 ? void 0 : decoratorsForTargetType[decoratorType]) !== null && _b !== void 0 ? _b : {};
+		decoratorsForTargetType[decoratorType] = decoratorsForType;
+		let decoratorsForKey = (_c = decoratorsForType === null || decoratorsForType === void 0 ? void 0 : decoratorsForType[key]) !== null && _c !== void 0 ? _c : [];
+		decoratorsForType[key] = decoratorsForKey;
+		decoratorsForKey.push(decorator);
+		return decorator(object, key, ...otherArgs);
+	});
+	const decorate = (decorator) => ((...args) => {
+		if (args.length === 1) return decorateClass(decorator)(args[0]);
+		return decorateMember(decorator)(...args);
+	});
+	exports.decorate = decorate;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/mixins.js
+var require_mixins = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.mix = exports.Mixin = void 0;
+	const proxy_1 = require_proxy();
+	const settings_1 = require_settings();
+	const util_1 = require_util();
+	const decorator_1 = require_decorator();
+	const mixin_tracking_1 = require_mixin_tracking();
+	function Mixin(...constructors) {
+		var _a, _b, _c;
+		const prototypes = constructors.map((constructor) => constructor.prototype);
+		const initFunctionName = settings_1.settings.initFunction;
+		if (initFunctionName !== null) {
+			const initFunctions = prototypes.map((proto) => proto[initFunctionName]).filter((func) => typeof func === "function");
+			const combinedInitFunction = function(...args) {
+				for (let initFunction of initFunctions) initFunction.apply(this, args);
+			};
+			const extraProto = { [initFunctionName]: combinedInitFunction };
+			prototypes.push(extraProto);
+		}
+		function MixedClass(...args) {
+			for (const constructor of constructors) (0, util_1.copyProps)(this, new constructor(...args));
+			if (initFunctionName !== null && typeof this[initFunctionName] === "function") this[initFunctionName].apply(this, args);
+		}
+		MixedClass.prototype = settings_1.settings.prototypeStrategy === "copy" ? (0, util_1.hardMixProtos)(prototypes, MixedClass) : (0, proxy_1.softMixProtos)(prototypes, MixedClass);
+		Object.setPrototypeOf(MixedClass, settings_1.settings.staticsStrategy === "copy" ? (0, util_1.hardMixProtos)(constructors, null, ["prototype"]) : (0, proxy_1.proxyMix)(constructors, Function.prototype));
+		let DecoratedMixedClass = MixedClass;
+		if (settings_1.settings.decoratorInheritance !== "none") {
+			const classDecorators = settings_1.settings.decoratorInheritance === "deep" ? (0, decorator_1.deepDecoratorSearch)(...constructors) : (0, decorator_1.directDecoratorSearch)(...constructors);
+			for (let decorator of (_a = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.class) !== null && _a !== void 0 ? _a : []) {
+				const result = decorator(DecoratedMixedClass);
+				if (result) DecoratedMixedClass = result;
+			}
+			applyPropAndMethodDecorators((_b = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.static) !== null && _b !== void 0 ? _b : {}, DecoratedMixedClass);
+			applyPropAndMethodDecorators((_c = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.instance) !== null && _c !== void 0 ? _c : {}, DecoratedMixedClass.prototype);
+		}
+		(0, mixin_tracking_1.registerMixins)(DecoratedMixedClass, constructors);
+		return DecoratedMixedClass;
+	}
+	exports.Mixin = Mixin;
+	const applyPropAndMethodDecorators = (propAndMethodDecorators, target) => {
+		const propDecorators = propAndMethodDecorators.property;
+		const methodDecorators = propAndMethodDecorators.method;
+		if (propDecorators) for (let key in propDecorators) for (let decorator of propDecorators[key]) decorator(target, key);
+		if (methodDecorators) for (let key in methodDecorators) for (let decorator of methodDecorators[key]) decorator(target, key, Object.getOwnPropertyDescriptor(target, key));
+	};
+	/**
+	* A decorator version of the `Mixin` function.  You'll want to use this instead of `Mixin` for mixing generic classes.
+	*/
+	const mix = (...ingredients) => (decoratedClass) => {
+		const mixedClass = Mixin(...ingredients.concat([decoratedClass]));
+		Object.defineProperty(mixedClass, "name", {
+			value: decoratedClass.name,
+			writable: false
+		});
+		return mixedClass;
+	};
+	exports.mix = mix;
+}));
+//#endregion
+//#region node_modules/ts-mixer/dist/cjs/index.js
+var require_cjs = /* @__PURE__ */ __commonJSMin(((exports) => {
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.hasMixin = exports.decorate = exports.settings = exports.mix = exports.Mixin = void 0;
+	var mixins_1 = require_mixins();
+	Object.defineProperty(exports, "Mixin", {
+		enumerable: true,
+		get: function() {
+			return mixins_1.Mixin;
+		}
+	});
+	Object.defineProperty(exports, "mix", {
+		enumerable: true,
+		get: function() {
+			return mixins_1.mix;
+		}
+	});
+	var settings_1 = require_settings();
+	Object.defineProperty(exports, "settings", {
+		enumerable: true,
+		get: function() {
+			return settings_1.settings;
+		}
+	});
+	var decorator_1 = require_decorator();
+	Object.defineProperty(exports, "decorate", {
+		enumerable: true,
+		get: function() {
+			return decorator_1.decorate;
+		}
+	});
+	var mixin_tracking_1 = require_mixin_tracking();
+	Object.defineProperty(exports, "hasMixin", {
+		enumerable: true,
+		get: function() {
+			return mixin_tracking_1.hasMixin;
+		}
+	});
+}));
 //#endregion
 //#region node_modules/@bufbuild/protobuf/dist/esm/wire/varint.js
 /**
@@ -1063,448 +1385,8 @@ function assertFloat32(arg) {
 	if (Number.isFinite(arg) && (arg > 34028234663852886e22 || arg < -34028234663852886e22)) throw new Error("invalid float32: " + arg);
 }
 //#endregion
-//#region src/networks/fetch_implementation.ts
-var FetchNetwork = class {
-	async invokeHttp({ method, uri, headers = {}, requestBody }) {
-		const response = await fetch(uri, {
-			method,
-			headers: new Headers(headers),
-			body: requestBody == null ? null : new ReadableStream({ start(controller) {
-				controller.enqueue(requestBody);
-				controller.close();
-			} })
-		});
-		const responseHeaders = {};
-		response.headers.forEach((value, key) => {
-			responseHeaders[key] = value;
-		});
-		return {
-			status: response.status,
-			headers: responseHeaders,
-			body: await response.bytes()
-		};
-	}
-};
-//#endregion
-//#region src/networks/wx_implementation.ts
-var WxNetwork = class {
-	invokeHttp({ method, uri, headers = {}, requestBody }) {
-		const buf = requestBody?.buffer;
-		return new Promise((resolve, reject) => {
-			const opts = {
-				url: uri,
-				method,
-				header: headers,
-				responseType: "arraybuffer",
-				timeout: 5e3,
-				success: (res) => {
-					resolve({
-						status: res.statusCode,
-						headers: res.header,
-						body: new Uint8Array(res.data)
-					});
-				},
-				fail: (err) => {
-					reject(err);
-				}
-			};
-			if (buf != null) opts.data = buf;
-			wx.request(opts);
-		});
-	}
-};
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/util.js
-var require_util = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.flatten = exports.unique = exports.hardMixProtos = exports.nearestCommonProto = exports.protoChain = exports.copyProps = void 0;
-	/**
-	* Utility function that works like `Object.apply`, but copies getters and setters properly as well.  Additionally gives
-	* the option to exclude properties by name.
-	*/
-	const copyProps = (dest, src, exclude = []) => {
-		const props = Object.getOwnPropertyDescriptors(src);
-		for (let prop of exclude) delete props[prop];
-		Object.defineProperties(dest, props);
-	};
-	exports.copyProps = copyProps;
-	/**
-	* Returns the full chain of prototypes up until Object.prototype given a starting object.  The order of prototypes will
-	* be closest to farthest in the chain.
-	*/
-	const protoChain = (obj, currentChain = [obj]) => {
-		const proto = Object.getPrototypeOf(obj);
-		if (proto === null) return currentChain;
-		return (0, exports.protoChain)(proto, [...currentChain, proto]);
-	};
-	exports.protoChain = protoChain;
-	/**
-	* Identifies the nearest ancestor common to all the given objects in their prototype chains.  For most unrelated
-	* objects, this function should return Object.prototype.
-	*/
-	const nearestCommonProto = (...objs) => {
-		if (objs.length === 0) return void 0;
-		let commonProto = void 0;
-		const protoChains = objs.map((obj) => (0, exports.protoChain)(obj));
-		while (protoChains.every((protoChain) => protoChain.length > 0)) {
-			const protos = protoChains.map((protoChain) => protoChain.pop());
-			const potentialCommonProto = protos[0];
-			if (protos.every((proto) => proto === potentialCommonProto)) commonProto = potentialCommonProto;
-			else break;
-		}
-		return commonProto;
-	};
-	exports.nearestCommonProto = nearestCommonProto;
-	/**
-	* Creates a new prototype object that is a mixture of the given prototypes.  The mixing is achieved by first
-	* identifying the nearest common ancestor and using it as the prototype for a new object.  Then all properties/methods
-	* downstream of this prototype (ONLY downstream) are copied into the new object.
-	*
-	* The resulting prototype is more performant than softMixProtos(...), as well as ES5 compatible.  However, it's not as
-	* flexible as updates to the source prototypes aren't captured by the mixed result.  See softMixProtos for why you may
-	* want to use that instead.
-	*/
-	const hardMixProtos = (ingredients, constructor, exclude = []) => {
-		var _a;
-		const base = (_a = (0, exports.nearestCommonProto)(...ingredients)) !== null && _a !== void 0 ? _a : Object.prototype;
-		const mixedProto = Object.create(base);
-		const visitedProtos = (0, exports.protoChain)(base);
-		for (let prototype of ingredients) {
-			let protos = (0, exports.protoChain)(prototype);
-			for (let i = protos.length - 1; i >= 0; i--) {
-				let newProto = protos[i];
-				if (visitedProtos.indexOf(newProto) === -1) {
-					(0, exports.copyProps)(mixedProto, newProto, ["constructor", ...exclude]);
-					visitedProtos.push(newProto);
-				}
-			}
-		}
-		mixedProto.constructor = constructor;
-		return mixedProto;
-	};
-	exports.hardMixProtos = hardMixProtos;
-	const unique = (arr) => arr.filter((e, i) => arr.indexOf(e) == i);
-	exports.unique = unique;
-	const flatten = (arr) => arr.length === 0 ? [] : arr.length === 1 ? arr[0] : arr.reduce((a1, a2) => [...a1, ...a2]);
-	exports.flatten = flatten;
-}));
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/proxy.js
-var require_proxy = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.softMixProtos = exports.proxyMix = exports.getIngredientWithProp = void 0;
-	const util_1 = require_util();
-	/**
-	* Finds the ingredient with the given prop, searching in reverse order and breadth-first if searching ingredient
-	* prototypes is required.
-	*/
-	const getIngredientWithProp = (prop, ingredients) => {
-		const protoChains = ingredients.map((ingredient) => (0, util_1.protoChain)(ingredient));
-		let protoDepth = 0;
-		let protosAreLeftToSearch = true;
-		while (protosAreLeftToSearch) {
-			protosAreLeftToSearch = false;
-			for (let i = ingredients.length - 1; i >= 0; i--) {
-				const searchTarget = protoChains[i][protoDepth];
-				if (searchTarget !== void 0 && searchTarget !== null) {
-					protosAreLeftToSearch = true;
-					if (Object.getOwnPropertyDescriptor(searchTarget, prop) != void 0) return protoChains[i][0];
-				}
-			}
-			protoDepth++;
-		}
-	};
-	exports.getIngredientWithProp = getIngredientWithProp;
-	/**
-	* "Mixes" ingredients by wrapping them in a Proxy.  The optional prototype argument allows the mixed object to sit
-	* downstream of an existing prototype chain.  Note that "properties" cannot be added, deleted, or modified.
-	*/
-	const proxyMix = (ingredients, prototype = Object.prototype) => new Proxy({}, {
-		getPrototypeOf() {
-			return prototype;
-		},
-		setPrototypeOf() {
-			throw Error("Cannot set prototype of Proxies created by ts-mixer");
-		},
-		getOwnPropertyDescriptor(_, prop) {
-			return Object.getOwnPropertyDescriptor((0, exports.getIngredientWithProp)(prop, ingredients) || {}, prop);
-		},
-		defineProperty() {
-			throw new Error("Cannot define new properties on Proxies created by ts-mixer");
-		},
-		has(_, prop) {
-			return (0, exports.getIngredientWithProp)(prop, ingredients) !== void 0 || prototype[prop] !== void 0;
-		},
-		get(_, prop) {
-			return ((0, exports.getIngredientWithProp)(prop, ingredients) || prototype)[prop];
-		},
-		set(_, prop, val) {
-			const ingredientWithProp = (0, exports.getIngredientWithProp)(prop, ingredients);
-			if (ingredientWithProp === void 0) throw new Error("Cannot set new properties on Proxies created by ts-mixer");
-			ingredientWithProp[prop] = val;
-			return true;
-		},
-		deleteProperty() {
-			throw new Error("Cannot delete properties on Proxies created by ts-mixer");
-		},
-		ownKeys() {
-			return ingredients.map(Object.getOwnPropertyNames).reduce((prev, curr) => curr.concat(prev.filter((key) => curr.indexOf(key) < 0)));
-		}
-	});
-	exports.proxyMix = proxyMix;
-	/**
-	* Creates a new proxy-prototype object that is a "soft" mixture of the given prototypes.  The mixing is achieved by
-	* proxying all property access to the ingredients.  This is not ES5 compatible and less performant.  However, any
-	* changes made to the source prototypes will be reflected in the proxy-prototype, which may be desirable.
-	*/
-	const softMixProtos = (ingredients, constructor) => (0, exports.proxyMix)([...ingredients, { constructor }]);
-	exports.softMixProtos = softMixProtos;
-}));
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/settings.js
-var require_settings = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.settings = void 0;
-	exports.settings = {
-		initFunction: null,
-		staticsStrategy: "copy",
-		prototypeStrategy: "copy",
-		decoratorInheritance: "deep"
-	};
-}));
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/mixin-tracking.js
-var require_mixin_tracking = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.hasMixin = exports.registerMixins = exports.getMixinsForClass = void 0;
-	const util_1 = require_util();
-	const mixins = /* @__PURE__ */ new WeakMap();
-	const getMixinsForClass = (clazz) => mixins.get(clazz);
-	exports.getMixinsForClass = getMixinsForClass;
-	const registerMixins = (mixedClass, constituents) => mixins.set(mixedClass, constituents);
-	exports.registerMixins = registerMixins;
-	const hasMixin = (instance, mixin) => {
-		if (instance instanceof mixin) return true;
-		const constructor = instance.constructor;
-		const visited = /* @__PURE__ */ new Set();
-		let frontier = /* @__PURE__ */ new Set();
-		frontier.add(constructor);
-		while (frontier.size > 0) {
-			if (frontier.has(mixin)) return true;
-			frontier.forEach((item) => visited.add(item));
-			const newFrontier = /* @__PURE__ */ new Set();
-			frontier.forEach((item) => {
-				var _a;
-				const itemConstituents = (_a = mixins.get(item)) !== null && _a !== void 0 ? _a : (0, util_1.protoChain)(item.prototype).map((proto) => proto.constructor).filter((item) => item !== null);
-				if (itemConstituents) itemConstituents.forEach((constituent) => {
-					if (!visited.has(constituent) && !frontier.has(constituent)) newFrontier.add(constituent);
-				});
-			});
-			frontier = newFrontier;
-		}
-		return false;
-	};
-	exports.hasMixin = hasMixin;
-}));
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/decorator.js
-var require_decorator = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.decorate = exports.getDecoratorsForClass = exports.directDecoratorSearch = exports.deepDecoratorSearch = void 0;
-	const util_1 = require_util();
-	const mixin_tracking_1 = require_mixin_tracking();
-	const mergeObjectsOfDecorators = (o1, o2) => {
-		var _a, _b;
-		const allKeys = (0, util_1.unique)([...Object.getOwnPropertyNames(o1), ...Object.getOwnPropertyNames(o2)]);
-		const mergedObject = {};
-		for (let key of allKeys) mergedObject[key] = (0, util_1.unique)([...(_a = o1 === null || o1 === void 0 ? void 0 : o1[key]) !== null && _a !== void 0 ? _a : [], ...(_b = o2 === null || o2 === void 0 ? void 0 : o2[key]) !== null && _b !== void 0 ? _b : []]);
-		return mergedObject;
-	};
-	const mergePropertyAndMethodDecorators = (d1, d2) => {
-		var _a, _b, _c, _d;
-		return {
-			property: mergeObjectsOfDecorators((_a = d1 === null || d1 === void 0 ? void 0 : d1.property) !== null && _a !== void 0 ? _a : {}, (_b = d2 === null || d2 === void 0 ? void 0 : d2.property) !== null && _b !== void 0 ? _b : {}),
-			method: mergeObjectsOfDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.method) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.method) !== null && _d !== void 0 ? _d : {})
-		};
-	};
-	const mergeDecorators = (d1, d2) => {
-		var _a, _b, _c, _d, _e, _f;
-		return {
-			class: (0, util_1.unique)([...(_a = d1 === null || d1 === void 0 ? void 0 : d1.class) !== null && _a !== void 0 ? _a : [], ...(_b = d2 === null || d2 === void 0 ? void 0 : d2.class) !== null && _b !== void 0 ? _b : []]),
-			static: mergePropertyAndMethodDecorators((_c = d1 === null || d1 === void 0 ? void 0 : d1.static) !== null && _c !== void 0 ? _c : {}, (_d = d2 === null || d2 === void 0 ? void 0 : d2.static) !== null && _d !== void 0 ? _d : {}),
-			instance: mergePropertyAndMethodDecorators((_e = d1 === null || d1 === void 0 ? void 0 : d1.instance) !== null && _e !== void 0 ? _e : {}, (_f = d2 === null || d2 === void 0 ? void 0 : d2.instance) !== null && _f !== void 0 ? _f : {})
-		};
-	};
-	const decorators = /* @__PURE__ */ new Map();
-	const findAllConstituentClasses = (...classes) => {
-		var _a;
-		const allClasses = /* @__PURE__ */ new Set();
-		const frontier = /* @__PURE__ */ new Set([...classes]);
-		while (frontier.size > 0) for (let clazz of frontier) {
-			const protoChainClasses = (0, util_1.protoChain)(clazz.prototype).map((proto) => proto.constructor);
-			const mixinClasses = (_a = (0, mixin_tracking_1.getMixinsForClass)(clazz)) !== null && _a !== void 0 ? _a : [];
-			const newClasses = [...protoChainClasses, ...mixinClasses].filter((c) => !allClasses.has(c));
-			for (let newClass of newClasses) frontier.add(newClass);
-			allClasses.add(clazz);
-			frontier.delete(clazz);
-		}
-		return [...allClasses];
-	};
-	const deepDecoratorSearch = (...classes) => {
-		const decoratorsForClassChain = findAllConstituentClasses(...classes).map((clazz) => decorators.get(clazz)).filter((decorators) => !!decorators);
-		if (decoratorsForClassChain.length == 0) return {};
-		if (decoratorsForClassChain.length == 1) return decoratorsForClassChain[0];
-		return decoratorsForClassChain.reduce((d1, d2) => mergeDecorators(d1, d2));
-	};
-	exports.deepDecoratorSearch = deepDecoratorSearch;
-	const directDecoratorSearch = (...classes) => {
-		const classDecorators = classes.map((clazz) => (0, exports.getDecoratorsForClass)(clazz));
-		if (classDecorators.length === 0) return {};
-		if (classDecorators.length === 1) return classDecorators[0];
-		return classDecorators.reduce((d1, d2) => mergeDecorators(d1, d2));
-	};
-	exports.directDecoratorSearch = directDecoratorSearch;
-	const getDecoratorsForClass = (clazz) => {
-		let decoratorsForClass = decorators.get(clazz);
-		if (!decoratorsForClass) {
-			decoratorsForClass = {};
-			decorators.set(clazz, decoratorsForClass);
-		}
-		return decoratorsForClass;
-	};
-	exports.getDecoratorsForClass = getDecoratorsForClass;
-	const decorateClass = (decorator) => ((clazz) => {
-		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
-		let classDecorators = decoratorsForClass.class;
-		if (!classDecorators) {
-			classDecorators = [];
-			decoratorsForClass.class = classDecorators;
-		}
-		classDecorators.push(decorator);
-		return decorator(clazz);
-	});
-	const decorateMember = (decorator) => ((object, key, ...otherArgs) => {
-		var _a, _b, _c;
-		const decoratorTargetType = typeof object === "function" ? "static" : "instance";
-		const decoratorType = typeof object[key] === "function" ? "method" : "property";
-		const clazz = decoratorTargetType === "static" ? object : object.constructor;
-		const decoratorsForClass = (0, exports.getDecoratorsForClass)(clazz);
-		const decoratorsForTargetType = (_a = decoratorsForClass === null || decoratorsForClass === void 0 ? void 0 : decoratorsForClass[decoratorTargetType]) !== null && _a !== void 0 ? _a : {};
-		decoratorsForClass[decoratorTargetType] = decoratorsForTargetType;
-		let decoratorsForType = (_b = decoratorsForTargetType === null || decoratorsForTargetType === void 0 ? void 0 : decoratorsForTargetType[decoratorType]) !== null && _b !== void 0 ? _b : {};
-		decoratorsForTargetType[decoratorType] = decoratorsForType;
-		let decoratorsForKey = (_c = decoratorsForType === null || decoratorsForType === void 0 ? void 0 : decoratorsForType[key]) !== null && _c !== void 0 ? _c : [];
-		decoratorsForType[key] = decoratorsForKey;
-		decoratorsForKey.push(decorator);
-		return decorator(object, key, ...otherArgs);
-	});
-	const decorate = (decorator) => ((...args) => {
-		if (args.length === 1) return decorateClass(decorator)(args[0]);
-		return decorateMember(decorator)(...args);
-	});
-	exports.decorate = decorate;
-}));
-//#endregion
-//#region node_modules/ts-mixer/dist/cjs/mixins.js
-var require_mixins = /* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.mix = exports.Mixin = void 0;
-	const proxy_1 = require_proxy();
-	const settings_1 = require_settings();
-	const util_1 = require_util();
-	const decorator_1 = require_decorator();
-	const mixin_tracking_1 = require_mixin_tracking();
-	function Mixin(...constructors) {
-		var _a, _b, _c;
-		const prototypes = constructors.map((constructor) => constructor.prototype);
-		const initFunctionName = settings_1.settings.initFunction;
-		if (initFunctionName !== null) {
-			const initFunctions = prototypes.map((proto) => proto[initFunctionName]).filter((func) => typeof func === "function");
-			const combinedInitFunction = function(...args) {
-				for (let initFunction of initFunctions) initFunction.apply(this, args);
-			};
-			const extraProto = { [initFunctionName]: combinedInitFunction };
-			prototypes.push(extraProto);
-		}
-		function MixedClass(...args) {
-			for (const constructor of constructors) (0, util_1.copyProps)(this, new constructor(...args));
-			if (initFunctionName !== null && typeof this[initFunctionName] === "function") this[initFunctionName].apply(this, args);
-		}
-		MixedClass.prototype = settings_1.settings.prototypeStrategy === "copy" ? (0, util_1.hardMixProtos)(prototypes, MixedClass) : (0, proxy_1.softMixProtos)(prototypes, MixedClass);
-		Object.setPrototypeOf(MixedClass, settings_1.settings.staticsStrategy === "copy" ? (0, util_1.hardMixProtos)(constructors, null, ["prototype"]) : (0, proxy_1.proxyMix)(constructors, Function.prototype));
-		let DecoratedMixedClass = MixedClass;
-		if (settings_1.settings.decoratorInheritance !== "none") {
-			const classDecorators = settings_1.settings.decoratorInheritance === "deep" ? (0, decorator_1.deepDecoratorSearch)(...constructors) : (0, decorator_1.directDecoratorSearch)(...constructors);
-			for (let decorator of (_a = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.class) !== null && _a !== void 0 ? _a : []) {
-				const result = decorator(DecoratedMixedClass);
-				if (result) DecoratedMixedClass = result;
-			}
-			applyPropAndMethodDecorators((_b = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.static) !== null && _b !== void 0 ? _b : {}, DecoratedMixedClass);
-			applyPropAndMethodDecorators((_c = classDecorators === null || classDecorators === void 0 ? void 0 : classDecorators.instance) !== null && _c !== void 0 ? _c : {}, DecoratedMixedClass.prototype);
-		}
-		(0, mixin_tracking_1.registerMixins)(DecoratedMixedClass, constructors);
-		return DecoratedMixedClass;
-	}
-	exports.Mixin = Mixin;
-	const applyPropAndMethodDecorators = (propAndMethodDecorators, target) => {
-		const propDecorators = propAndMethodDecorators.property;
-		const methodDecorators = propAndMethodDecorators.method;
-		if (propDecorators) for (let key in propDecorators) for (let decorator of propDecorators[key]) decorator(target, key);
-		if (methodDecorators) for (let key in methodDecorators) for (let decorator of methodDecorators[key]) decorator(target, key, Object.getOwnPropertyDescriptor(target, key));
-	};
-	/**
-	* A decorator version of the `Mixin` function.  You'll want to use this instead of `Mixin` for mixing generic classes.
-	*/
-	const mix = (...ingredients) => (decoratedClass) => {
-		const mixedClass = Mixin(...ingredients.concat([decoratedClass]));
-		Object.defineProperty(mixedClass, "name", {
-			value: decoratedClass.name,
-			writable: false
-		});
-		return mixedClass;
-	};
-	exports.mix = mix;
-}));
-//#endregion
 //#region src/networks/network.ts
-var import_cjs = (/* @__PURE__ */ __commonJSMin(((exports) => {
-	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.hasMixin = exports.decorate = exports.settings = exports.mix = exports.Mixin = void 0;
-	var mixins_1 = require_mixins();
-	Object.defineProperty(exports, "Mixin", {
-		enumerable: true,
-		get: function() {
-			return mixins_1.Mixin;
-		}
-	});
-	Object.defineProperty(exports, "mix", {
-		enumerable: true,
-		get: function() {
-			return mixins_1.mix;
-		}
-	});
-	var settings_1 = require_settings();
-	Object.defineProperty(exports, "settings", {
-		enumerable: true,
-		get: function() {
-			return settings_1.settings;
-		}
-	});
-	var decorator_1 = require_decorator();
-	Object.defineProperty(exports, "decorate", {
-		enumerable: true,
-		get: function() {
-			return decorator_1.decorate;
-		}
-	});
-	var mixin_tracking_1 = require_mixin_tracking();
-	Object.defineProperty(exports, "hasMixin", {
-		enumerable: true,
-		get: function() {
-			return mixin_tracking_1.hasMixin;
-		}
-	});
-})))();
+var import_cjs = require_cjs();
 function composeUri({ base, path = "/", params = {} }) {
 	while (base.endsWith("/")) base = base.substring(0, base.length - 1);
 	while (path.startsWith("/")) path = path.substring(1);
@@ -1556,6 +1438,22 @@ function responseStatusToJSON(object) {
 		default: return "UNRECOGNIZED";
 	}
 }
+function addRemoveOpTypeFromJSON(object) {
+	switch (object) {
+		case 0:
+		case "Add": return 0;
+		case 1:
+		case "Remove": return 1;
+		default: return -1;
+	}
+}
+function addRemoveOpTypeToJSON(object) {
+	switch (object) {
+		case 0: return "Add";
+		case 1: return "Remove";
+		default: return "UNRECOGNIZED";
+	}
+}
 function createBaseCommonApiData() {
 	return {
 		appId: 0,
@@ -1604,9 +1502,9 @@ const CommonApiData = {
 	},
 	fromJSON(object) {
 		return {
-			appId: isSet$5(object.appId) ? globalThis.Number(object.appId) : 0,
-			path: isSet$5(object.path) ? globalThis.String(object.path) : "",
-			sceneId: isSet$5(object.sceneId) ? globalThis.Number(object.sceneId) : 0
+			appId: isSet$7(object.appId) ? globalThis.Number(object.appId) : 0,
+			path: isSet$7(object.path) ? globalThis.String(object.path) : "",
+			sceneId: isSet$7(object.sceneId) ? globalThis.Number(object.sceneId) : 0
 		};
 	},
 	toJSON(message) {
@@ -1669,8 +1567,8 @@ const CommonResponseData = {
 	},
 	fromJSON(object) {
 		return {
-			status: isSet$5(object.status) ? responseStatusFromJSON(object.status) : 0,
-			message: isSet$5(object.message) ? globalThis.String(object.message) : ""
+			status: isSet$7(object.status) ? responseStatusFromJSON(object.status) : 0,
+			message: isSet$7(object.message) ? globalThis.String(object.message) : ""
 		};
 	},
 	toJSON(message) {
@@ -1732,7 +1630,7 @@ const MediaAsset = {
 				switch (tag >>> 3) {
 					case 1:
 						if (tag !== 8) break;
-						message.id = longToNumber$2(reader.int64());
+						message.id = longToNumber$5(reader.int64());
 						continue;
 					case 3:
 						if (tag !== 26) break;
@@ -1752,7 +1650,7 @@ const MediaAsset = {
 						continue;
 					case 7:
 						if (tag !== 56) break;
-						message.ownerId = longToNumber$2(reader.int64());
+						message.ownerId = longToNumber$5(reader.int64());
 						continue;
 					case 8:
 						if (tag !== 66) break;
@@ -1764,7 +1662,7 @@ const MediaAsset = {
 						continue;
 					case 11:
 						if (tag !== 88) break;
-						message.viewCount = longToNumber$2(reader.int64());
+						message.viewCount = longToNumber$5(reader.int64());
 						continue;
 					case 12:
 						if (tag !== 96) break;
@@ -1785,17 +1683,17 @@ const MediaAsset = {
 	},
 	fromJSON(object) {
 		return {
-			id: isSet$5(object.id) ? globalThis.Number(object.id) : 0,
-			url: isSet$5(object.url) ? globalThis.String(object.url) : "",
-			cover: isSet$5(object.cover) ? globalThis.String(object.cover) : "",
-			title: isSet$5(object.title) ? globalThis.String(object.title) : "",
+			id: isSet$7(object.id) ? globalThis.Number(object.id) : 0,
+			url: isSet$7(object.url) ? globalThis.String(object.url) : "",
+			cover: isSet$7(object.cover) ? globalThis.String(object.cover) : "",
+			title: isSet$7(object.title) ? globalThis.String(object.title) : "",
 			tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e) => globalThis.String(e)) : [],
-			ownerId: isSet$5(object.ownerId) ? globalThis.Number(object.ownerId) : 0,
-			ownerNickname: isSet$5(object.ownerNickname) ? globalThis.String(object.ownerNickname) : void 0,
-			ownerAvatar: isSet$5(object.ownerAvatar) ? globalThis.String(object.ownerAvatar) : void 0,
-			viewCount: isSet$5(object.viewCount) ? globalThis.Number(object.viewCount) : 0,
-			isFavorite: isSet$5(object.isFavorite) ? globalThis.Boolean(object.isFavorite) : false,
-			banned: isSet$5(object.banned) ? globalThis.Boolean(object.banned) : false
+			ownerId: isSet$7(object.ownerId) ? globalThis.Number(object.ownerId) : 0,
+			ownerNickname: isSet$7(object.ownerNickname) ? globalThis.String(object.ownerNickname) : void 0,
+			ownerAvatar: isSet$7(object.ownerAvatar) ? globalThis.String(object.ownerAvatar) : void 0,
+			viewCount: isSet$7(object.viewCount) ? globalThis.Number(object.viewCount) : 0,
+			isFavorite: isSet$7(object.isFavorite) ? globalThis.Boolean(object.isFavorite) : false,
+			banned: isSet$7(object.banned) ? globalThis.Boolean(object.banned) : false
 		};
 	},
 	toJSON(message) {
@@ -1832,13 +1730,353 @@ const MediaAsset = {
 		return message;
 	}
 };
-function longToNumber$2(int64) {
+function createBaseOssPutMeta() {
+	return {
+		url: "",
+		form: {}
+	};
+}
+const OssPutMeta = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.url !== "") writer.uint32(10).string(message.url);
+		globalThis.Object.entries(message.form).forEach(([key, value]) => {
+			OssPutMeta_FormEntry.encode({
+				key,
+				value
+			}, writer.uint32(18).fork()).join();
+		});
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseOssPutMeta();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.url = reader.string();
+						continue;
+					case 2: {
+						if (tag !== 18) break;
+						const entry2 = OssPutMeta_FormEntry.decode(reader, reader.uint32());
+						if (entry2.value !== void 0) message.form[entry2.key] = entry2.value;
+						continue;
+					}
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			url: isSet$7(object.url) ? globalThis.String(object.url) : "",
+			form: isObject$1(object.form) ? globalThis.Object.entries(object.form).reduce((acc, [key, value]) => {
+				globalThis.Object.defineProperty(acc, key, {
+					value: globalThis.String(value),
+					enumerable: true,
+					configurable: true,
+					writable: true
+				});
+				return acc;
+			}, {}) : {}
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.url !== "") obj.url = message.url;
+		if (message.form) {
+			const entries = globalThis.Object.entries(message.form);
+			if (entries.length > 0) {
+				obj.form = {};
+				entries.forEach(([k, v]) => {
+					obj.form[k] = v;
+				});
+			}
+		}
+		return obj;
+	},
+	create(base) {
+		return OssPutMeta.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseOssPutMeta();
+		message.url = object.url ?? "";
+		message.form = globalThis.Object.entries(object.form ?? {}).reduce((acc, [key, value]) => {
+			if (value !== void 0) acc[key] = globalThis.String(value);
+			return acc;
+		}, {});
+		return message;
+	}
+};
+function createBaseOssPutMeta_FormEntry() {
+	return {
+		key: "",
+		value: ""
+	};
+}
+const OssPutMeta_FormEntry = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.key !== "") writer.uint32(10).string(message.key);
+		if (message.value !== "") writer.uint32(18).string(message.value);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseOssPutMeta_FormEntry();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.key = reader.string();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.value = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			key: isSet$7(object.key) ? globalThis.String(object.key) : "",
+			value: isSet$7(object.value) ? globalThis.String(object.value) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.key !== "") obj.key = message.key;
+		if (message.value !== "") obj.value = message.value;
+		return obj;
+	},
+	create(base) {
+		return OssPutMeta_FormEntry.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseOssPutMeta_FormEntry();
+		message.key = object.key ?? "";
+		message.value = object.value ?? "";
+		return message;
+	}
+};
+function createBaseDraftAsset() {
+	return {
+		id: 0,
+		mediaId: void 0,
+		url: void 0,
+		cover: void 0,
+		title: "",
+		approved: false,
+		rejectReason: void 0
+	};
+}
+const DraftAsset = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.id !== 0) writer.uint32(8).int64(message.id);
+		if (message.mediaId !== void 0) writer.uint32(16).int64(message.mediaId);
+		if (message.url !== void 0) writer.uint32(26).string(message.url);
+		if (message.cover !== void 0) writer.uint32(34).string(message.cover);
+		if (message.title !== "") writer.uint32(42).string(message.title);
+		if (message.approved !== false) writer.uint32(48).bool(message.approved);
+		if (message.rejectReason !== void 0) writer.uint32(58).string(message.rejectReason);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseDraftAsset();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.id = longToNumber$5(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.mediaId = longToNumber$5(reader.int64());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.url = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.cover = reader.string();
+						continue;
+					case 5:
+						if (tag !== 42) break;
+						message.title = reader.string();
+						continue;
+					case 6:
+						if (tag !== 48) break;
+						message.approved = reader.bool();
+						continue;
+					case 7:
+						if (tag !== 58) break;
+						message.rejectReason = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			id: isSet$7(object.id) ? globalThis.Number(object.id) : 0,
+			mediaId: isSet$7(object.mediaId) ? globalThis.Number(object.mediaId) : isSet$7(object.media_id) ? globalThis.Number(object.media_id) : void 0,
+			url: isSet$7(object.url) ? globalThis.String(object.url) : void 0,
+			cover: isSet$7(object.cover) ? globalThis.String(object.cover) : void 0,
+			title: isSet$7(object.title) ? globalThis.String(object.title) : "",
+			approved: isSet$7(object.approved) ? globalThis.Boolean(object.approved) : false,
+			rejectReason: isSet$7(object.rejectReason) ? globalThis.String(object.rejectReason) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.mediaId !== void 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.url !== void 0) obj.url = message.url;
+		if (message.cover !== void 0) obj.cover = message.cover;
+		if (message.title !== "") obj.title = message.title;
+		if (message.approved !== false) obj.approved = message.approved;
+		if (message.rejectReason !== void 0) obj.rejectReason = message.rejectReason;
+		return obj;
+	},
+	create(base) {
+		return DraftAsset.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseDraftAsset();
+		message.id = object.id ?? 0;
+		message.mediaId = object.mediaId ?? void 0;
+		message.url = object.url ?? void 0;
+		message.cover = object.cover ?? void 0;
+		message.title = object.title ?? "";
+		message.approved = object.approved ?? false;
+		message.rejectReason = object.rejectReason ?? void 0;
+		return message;
+	}
+};
+function createBaseArticle() {
+	return {
+		address: "",
+		image: "",
+		title: "",
+		brief: ""
+	};
+}
+const Article$1 = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.address !== "") writer.uint32(10).string(message.address);
+		if (message.image !== "") writer.uint32(18).string(message.image);
+		if (message.title !== "") writer.uint32(26).string(message.title);
+		if (message.brief !== "") writer.uint32(34).string(message.brief);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseArticle();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.address = reader.string();
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.image = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.title = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.brief = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			address: isSet$7(object.address) ? globalThis.String(object.address) : "",
+			image: isSet$7(object.image) ? globalThis.String(object.image) : "",
+			title: isSet$7(object.title) ? globalThis.String(object.title) : "",
+			brief: isSet$7(object.brief) ? globalThis.String(object.brief) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.address !== "") obj.address = message.address;
+		if (message.image !== "") obj.image = message.image;
+		if (message.title !== "") obj.title = message.title;
+		if (message.brief !== "") obj.brief = message.brief;
+		return obj;
+	},
+	create(base) {
+		return Article$1.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseArticle();
+		message.address = object.address ?? "";
+		message.image = object.image ?? "";
+		message.title = object.title ?? "";
+		message.brief = object.brief ?? "";
+		return message;
+	}
+};
+function longToNumber$5(int64) {
 	const num = globalThis.Number(int64.toString());
 	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
 	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
 	return num;
 }
-function isSet$5(value) {
+function isObject$1(value) {
+	return typeof value === "object" && value !== null;
+}
+function isSet$7(value) {
 	return value !== null && value !== void 0;
 }
 const allInOnePool = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`;
@@ -1892,6 +2130,7 @@ var BaseSessionManagement = class {
 		}
 		if (this.cachedPath == path) return;
 		this.cachedPath = path;
+		console.log("setCurrentPath", path, trimParams);
 		this.reportOneLog((base) => [{
 			base,
 			openPage: { params: trimParams }
@@ -1937,7 +2176,9 @@ var BaseSessionManagement = class {
 		const { needLogin } = await (async (openId) => {
 			try {
 				if (openId.length > 0) return await this.userSessionCheck({ openId });
-			} catch (e) {}
+			} catch (e) {
+				console.log("user session check", e);
+			}
 			return { needLogin: true };
 		})(this.cacheOpenId.value.trim());
 		if (!needLogin) return;
@@ -1946,7 +2187,8 @@ var BaseSessionManagement = class {
 			await this.userLogin({ code: response.code });
 			return;
 		} catch (e) {
-			await new Promise((resolve) => setTimeout(resolve, 1e3));
+			console.log("do user login", e);
+			throw e;
 		}
 	}
 	updateAppInfo() {
@@ -1980,6 +2222,7 @@ var BaseSessionManagement = class {
 	}
 	updateOpenApp(newOpenApp) {
 		if (this.openApp != null && this.openApp?.path == newOpenApp.path && this.openApp?.scene == newOpenApp.scene) return;
+		console.log("updateOpenApp", newOpenApp, this.openApp);
 		this.openApp = newOpenApp;
 		this.reportOneLog((base) => [{
 			base,
@@ -1996,7 +2239,9 @@ var CachedString = class {
 	get value() {
 		if (this.cache == null) try {
 			this.cache = wx.getStorageSync(this.key);
-		} catch (e) {}
+		} catch (e) {
+			console.log(`get ${this.key} in cache`, e);
+		}
 		return this.cache ?? this.empty;
 	}
 	set value(v) {
@@ -2004,6 +2249,115 @@ var CachedString = class {
 		wx.setStorageSync(this.key, v);
 	}
 };
+//#endregion
+//#region src/compatible/utf8.ts
+var Utf8TextEncoding = class {
+	checkUtf8(text) {
+		const size = text.length;
+		for (let i = 0; i < size; i++) {
+			const codePoint = text.charCodeAt(i);
+			if (isASCII(codePoint)) continue;
+			if (inRange(codePoint, 128, 1114111)) continue;
+			return false;
+		}
+		return true;
+	}
+	encodeUtf8(text) {
+		const bytes = [];
+		for (let i = 0; i < text.length; ++i) encodeCodePoint(text.charCodeAt(i), bytes);
+		return Uint8Array.from(bytes);
+	}
+	decodeUtf8(bytes) {
+		let codePoints = [];
+		const decoder = new CodePointDecoder();
+		for (const byte of bytes) {
+			const codePoint = decoder.decode(byte);
+			if (codePoint != null) codePoints.push(codePoint);
+		}
+		decoder.end();
+		return String.fromCodePoint(...codePoints);
+	}
+};
+function isASCII(value) {
+	return value >= 0 && value <= 127;
+}
+function inRange(value, min, max) {
+	return value >= min && value <= max;
+}
+function encodeCodePoint(codePoint, output) {
+	if (isASCII(codePoint)) {
+		output.push(codePoint);
+		return;
+	}
+	let appendCount;
+	let appendOffset;
+	if (inRange(codePoint, 128, 2047)) {
+		appendCount = 1;
+		appendOffset = 192;
+	} else if (inRange(codePoint, 2048, 65535)) {
+		appendCount = 2;
+		appendOffset = 224;
+	} else if (inRange(codePoint, 65536, 1114111)) {
+		appendCount = 3;
+		appendOffset = 240;
+	} else throw new Error("Could encode code point of text in utf-8");
+	output.push((codePoint >> 6 * appendCount) + appendOffset);
+	while (appendCount > 0) {
+		appendCount--;
+		const temp = codePoint >> 6 * appendCount;
+		output.push(128 | temp & 63);
+	}
+}
+var CodePointDecoder = class {
+	constructor() {
+		this.codePoint = 0;
+		this.bytesSeen = 0;
+		this.bytesNeeded = 0;
+		this.lowerBoundary = 128;
+		this.upperBoundary = 191;
+	}
+	decode(byte) {
+		if (this.bytesNeeded === 0) {
+			if (inRange(byte, 0, 127)) return byte;
+			else if (inRange(byte, 194, 223)) {
+				this.bytesNeeded = 1;
+				this.codePoint = byte & 31;
+			} else if (inRange(byte, 224, 239)) {
+				if (byte === 224) this.lowerBoundary = 160;
+				if (byte === 237) this.upperBoundary = 159;
+				this.bytesNeeded = 2;
+				this.codePoint = byte & 15;
+			} else if (inRange(byte, 240, 244)) {
+				if (byte === 240) this.lowerBoundary = 144;
+				if (byte === 244) this.upperBoundary = 143;
+				this.bytesNeeded = 3;
+				this.codePoint = byte & 7;
+			} else throw new Error(`Unexpected head byte ${byte}`);
+			return null;
+		}
+		if (!inRange(byte, this.lowerBoundary, this.upperBoundary)) {
+			this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
+			this.lowerBoundary = 128;
+			this.upperBoundary = 191;
+			throw new Error(`Unexpected byte mid ${byte} (expected ${this.lowerBoundary}, ${this.upperBoundary})`);
+		}
+		this.lowerBoundary = 128;
+		this.upperBoundary = 191;
+		this.codePoint = this.codePoint << 6 | byte & 63;
+		this.bytesSeen += 1;
+		if (this.bytesSeen !== this.bytesNeeded) return null;
+		const codePoint = this.codePoint;
+		this.codePoint = this.bytesNeeded = this.bytesSeen = 0;
+		return codePoint;
+	}
+	end() {
+		if (this.bytesNeeded !== 0) {
+			this.bytesNeeded = 0;
+			throw new Error("Unexpected eof");
+		}
+	}
+};
+const utf8Encoding = new Utf8TextEncoding();
 //#endregion
 //#region src/apis/base.ts
 var BaseApi = class extends BaseSessionManagement {
@@ -2013,6 +2367,7 @@ var BaseApi = class extends BaseSessionManagement {
 		this.network = network;
 	}
 	async invokeProtoApi(options) {
+		console.log("invokeProtoApi", options.path, options.params, options.requestBody);
 		const response = await this.network.invokeHttp({
 			method: options.method ?? "POST",
 			uri: composeUri({
@@ -2021,12 +2376,23 @@ var BaseApi = class extends BaseSessionManagement {
 				params: options.params
 			}),
 			headers: { "Content-Type": "application/protobuf" },
-			requestBody: options.requestMeta.encode(options.requestBody).finish()
+			requestBody: options.requestMeta.encode(options.requestBody, new BinaryWriter((text) => utf8Encoding.encodeUtf8(text))).finish()
 		});
-		response.headers["access-id"];
-		const body = options.responseMeta.decode(response.body);
+		const accessId = response.headers["access-id"] ?? "unknown access id";
+		const body = options.responseMeta.decode(new BinaryReader(response.body, (bytes) => utf8Encoding.decodeUtf8(bytes)));
+		console.log("invokeProtoApi.ok", options.path, options.params, options.requestBody, body, accessId);
 		checkApiResponse(options.extractor.commonOf(body));
 		return options.extractor.bodyOf(body);
+	}
+	invokeNoOutputProtoApi(options) {
+		return this.invokeProtoApi({
+			...options,
+			responseMeta: { decode: () => {} },
+			extractor: {
+				commonOf: () => void 0,
+				bodyOf: () => {}
+			}
+		});
 	}
 };
 var BadResponseException = class extends Error {
@@ -2096,8 +2462,8 @@ const SessionCheckRequest = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
-			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : ""
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : ""
 		};
 	},
 	toJSON(message) {
@@ -2164,9 +2530,9 @@ const SessionCheckResponse = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
-			needLogin: isSet$4(object.needLogin) ? globalThis.Boolean(object.needLogin) : false,
-			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			needLogin: isSet$6(object.needLogin) ? globalThis.Boolean(object.needLogin) : false,
+			shareMark: isSet$6(object.shareMark) ? globalThis.String(object.shareMark) : ""
 		};
 	},
 	toJSON(message) {
@@ -2229,8 +2595,8 @@ const LoginRequest = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
-			code: isSet$4(object.code) ? globalThis.String(object.code) : ""
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			code: isSet$6(object.code) ? globalThis.String(object.code) : ""
 		};
 	},
 	toJSON(message) {
@@ -2297,9 +2663,9 @@ const LoginResponse = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
-			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : "",
-			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			shareMark: isSet$6(object.shareMark) ? globalThis.String(object.shareMark) : ""
 		};
 	},
 	toJSON(message) {
@@ -2317,6 +2683,921 @@ const LoginResponse = {
 		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
 		message.openId = object.openId ?? "";
 		message.shareMark = object.shareMark ?? "";
+		return message;
+	}
+};
+function createBaseUpdateUserInfoRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		nickname: void 0,
+		avatar: void 0
+	};
+}
+const UpdateUserInfoRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.nickname !== void 0) writer.uint32(42).string(message.nickname);
+		if (message.avatar !== void 0) writer.uint32(50).string(message.avatar);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseUpdateUserInfoRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 5:
+						if (tag !== 42) break;
+						message.nickname = reader.string();
+						continue;
+					case 6:
+						if (tag !== 50) break;
+						message.avatar = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			nickname: isSet$6(object.nickname) ? globalThis.String(object.nickname) : void 0,
+			avatar: isSet$6(object.avatar) ? globalThis.String(object.avatar) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.nickname !== void 0) obj.nickname = message.nickname;
+		if (message.avatar !== void 0) obj.avatar = message.avatar;
+		return obj;
+	},
+	create(base) {
+		return UpdateUserInfoRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseUpdateUserInfoRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.nickname = object.nickname ?? void 0;
+		message.avatar = object.avatar ?? void 0;
+		return message;
+	}
+};
+function createBaseFollowOpRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		upId: 0,
+		op: 0
+	};
+}
+const FollowOpRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.upId !== 0) writer.uint32(24).int64(message.upId);
+		if (message.op !== 0) writer.uint32(32).int32(message.op);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseFollowOpRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.upId = longToNumber$4(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.op = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			upId: isSet$6(object.upId) ? globalThis.Number(object.upId) : 0,
+			op: isSet$6(object.op) ? addRemoveOpTypeFromJSON(object.op) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.upId !== 0) obj.upId = Math.round(message.upId);
+		if (message.op !== 0) obj.op = addRemoveOpTypeToJSON(message.op);
+		return obj;
+	},
+	create(base) {
+		return FollowOpRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseFollowOpRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.upId = object.upId ?? 0;
+		message.op = object.op ?? 0;
+		return message;
+	}
+};
+function createBaseGetUserInfoRequest() {
+	return {
+		common: void 0,
+		openId: void 0,
+		uid: void 0
+	};
+}
+const GetUserInfoRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== void 0) writer.uint32(18).string(message.openId);
+		if (message.uid !== void 0) writer.uint32(24).int64(message.uid);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetUserInfoRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.uid = longToNumber$4(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : void 0,
+			uid: isSet$6(object.uid) ? globalThis.Number(object.uid) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== void 0) obj.openId = message.openId;
+		if (message.uid !== void 0) obj.uid = Math.round(message.uid);
+		return obj;
+	},
+	create(base) {
+		return GetUserInfoRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetUserInfoRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? void 0;
+		message.uid = object.uid ?? void 0;
+		return message;
+	}
+};
+function createBaseBasicUserInfo() {
+	return {
+		id: 0,
+		nickname: void 0,
+		avatar: void 0,
+		videoCount: 0,
+		videoViewCount: 0,
+		fanCount: 0,
+		followCount: 0
+	};
+}
+const BasicUserInfo = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.id !== 0) writer.uint32(8).int64(message.id);
+		if (message.nickname !== void 0) writer.uint32(18).string(message.nickname);
+		if (message.avatar !== void 0) writer.uint32(26).string(message.avatar);
+		if (message.videoCount !== 0) writer.uint32(32).int64(message.videoCount);
+		if (message.videoViewCount !== 0) writer.uint32(40).int64(message.videoViewCount);
+		if (message.fanCount !== 0) writer.uint32(48).int64(message.fanCount);
+		if (message.followCount !== 0) writer.uint32(56).int64(message.followCount);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseBasicUserInfo();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.id = longToNumber$4(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.nickname = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.avatar = reader.string();
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.videoCount = longToNumber$4(reader.int64());
+						continue;
+					case 5:
+						if (tag !== 40) break;
+						message.videoViewCount = longToNumber$4(reader.int64());
+						continue;
+					case 6:
+						if (tag !== 48) break;
+						message.fanCount = longToNumber$4(reader.int64());
+						continue;
+					case 7:
+						if (tag !== 56) break;
+						message.followCount = longToNumber$4(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			id: isSet$6(object.id) ? globalThis.Number(object.id) : 0,
+			nickname: isSet$6(object.nickname) ? globalThis.String(object.nickname) : void 0,
+			avatar: isSet$6(object.avatar) ? globalThis.String(object.avatar) : void 0,
+			videoCount: isSet$6(object.videoCount) ? globalThis.Number(object.videoCount) : 0,
+			videoViewCount: isSet$6(object.videoViewCount) ? globalThis.Number(object.videoViewCount) : 0,
+			fanCount: isSet$6(object.fanCount) ? globalThis.Number(object.fanCount) : 0,
+			followCount: isSet$6(object.followCount) ? globalThis.Number(object.followCount) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.nickname !== void 0) obj.nickname = message.nickname;
+		if (message.avatar !== void 0) obj.avatar = message.avatar;
+		if (message.videoCount !== 0) obj.videoCount = Math.round(message.videoCount);
+		if (message.videoViewCount !== 0) obj.videoViewCount = Math.round(message.videoViewCount);
+		if (message.fanCount !== 0) obj.fanCount = Math.round(message.fanCount);
+		if (message.followCount !== 0) obj.followCount = Math.round(message.followCount);
+		return obj;
+	},
+	create(base) {
+		return BasicUserInfo.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseBasicUserInfo();
+		message.id = object.id ?? 0;
+		message.nickname = object.nickname ?? void 0;
+		message.avatar = object.avatar ?? void 0;
+		message.videoCount = object.videoCount ?? 0;
+		message.videoViewCount = object.videoViewCount ?? 0;
+		message.fanCount = object.fanCount ?? 0;
+		message.followCount = object.followCount ?? 0;
+		return message;
+	}
+};
+function createBaseGetUserInfoResponse() {
+	return {
+		common: void 0,
+		info: void 0
+	};
+}
+const GetUserInfoResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.info !== void 0) BasicUserInfo.encode(message.info, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetUserInfoResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.info = BasicUserInfo.decode(reader, reader.uint32());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			info: isSet$6(object.info) ? BasicUserInfo.fromJSON(object.info) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.info !== void 0) obj.info = BasicUserInfo.toJSON(message.info);
+		return obj;
+	},
+	create(base) {
+		return GetUserInfoResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetUserInfoResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.info = object.info !== void 0 && object.info !== null ? BasicUserInfo.fromPartial(object.info) : void 0;
+		return message;
+	}
+};
+function createBaseCheckIsFanRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		upOpenId: void 0,
+		upUid: void 0
+	};
+}
+const CheckIsFanRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.upOpenId !== void 0) writer.uint32(26).string(message.upOpenId);
+		if (message.upUid !== void 0) writer.uint32(32).int64(message.upUid);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCheckIsFanRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.upOpenId = reader.string();
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.upUid = longToNumber$4(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			upOpenId: isSet$6(object.upOpenId) ? globalThis.String(object.upOpenId) : void 0,
+			upUid: isSet$6(object.upUid) ? globalThis.Number(object.upUid) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.upOpenId !== void 0) obj.upOpenId = message.upOpenId;
+		if (message.upUid !== void 0) obj.upUid = Math.round(message.upUid);
+		return obj;
+	},
+	create(base) {
+		return CheckIsFanRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCheckIsFanRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.upOpenId = object.upOpenId ?? void 0;
+		message.upUid = object.upUid ?? void 0;
+		return message;
+	}
+};
+function createBaseCheckIsFanResponse() {
+	return {
+		common: void 0,
+		isFan: false
+	};
+}
+const CheckIsFanResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.isFan !== false) writer.uint32(16).bool(message.isFan);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCheckIsFanResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.isFan = reader.bool();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			isFan: isSet$6(object.isFan) ? globalThis.Boolean(object.isFan) : false
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.isFan !== false) obj.isFan = message.isFan;
+		return obj;
+	},
+	create(base) {
+		return CheckIsFanResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCheckIsFanResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.isFan = object.isFan ?? false;
+		return message;
+	}
+};
+function createBaseGetFollowListRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		cursor: void 0,
+		count: void 0,
+		hotCount: void 0
+	};
+}
+const GetFollowListRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.cursor !== void 0) writer.uint32(24).int64(message.cursor);
+		if (message.count !== void 0) writer.uint32(32).int32(message.count);
+		if (message.hotCount !== void 0) writer.uint32(40).int32(message.hotCount);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetFollowListRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.cursor = longToNumber$4(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.count = reader.int32();
+						continue;
+					case 5:
+						if (tag !== 40) break;
+						message.hotCount = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			cursor: isSet$6(object.cursor) ? globalThis.Number(object.cursor) : void 0,
+			count: isSet$6(object.count) ? globalThis.Number(object.count) : void 0,
+			hotCount: isSet$6(object.hotCount) ? globalThis.Number(object.hotCount) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.cursor !== void 0) obj.cursor = Math.round(message.cursor);
+		if (message.count !== void 0) obj.count = Math.round(message.count);
+		if (message.hotCount !== void 0) obj.hotCount = Math.round(message.hotCount);
+		return obj;
+	},
+	create(base) {
+		return GetFollowListRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetFollowListRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.cursor = object.cursor ?? void 0;
+		message.count = object.count ?? void 0;
+		message.hotCount = object.hotCount ?? void 0;
+		return message;
+	}
+};
+function createBaseGetFollowListItem() {
+	return {
+		user: void 0,
+		cursor: 0,
+		hot: []
+	};
+}
+const GetFollowListItem = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.user !== void 0) BasicUserInfo.encode(message.user, writer.uint32(10).fork()).join();
+		if (message.cursor !== 0) writer.uint32(16).int64(message.cursor);
+		for (const v of message.hot) MediaAsset.encode(v, writer.uint32(26).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetFollowListItem();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.user = BasicUserInfo.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.cursor = longToNumber$4(reader.int64());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.hot.push(MediaAsset.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			user: isSet$6(object.user) ? BasicUserInfo.fromJSON(object.user) : void 0,
+			cursor: isSet$6(object.cursor) ? globalThis.Number(object.cursor) : 0,
+			hot: globalThis.Array.isArray(object?.hot) ? object.hot.map((e) => MediaAsset.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.user !== void 0) obj.user = BasicUserInfo.toJSON(message.user);
+		if (message.cursor !== 0) obj.cursor = Math.round(message.cursor);
+		if (message.hot?.length) obj.hot = message.hot.map((e) => MediaAsset.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return GetFollowListItem.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetFollowListItem();
+		message.user = object.user !== void 0 && object.user !== null ? BasicUserInfo.fromPartial(object.user) : void 0;
+		message.cursor = object.cursor ?? 0;
+		message.hot = object.hot?.map((e) => MediaAsset.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseGetFollowListResponse() {
+	return {
+		common: void 0,
+		items: []
+	};
+}
+const GetFollowListResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.items) GetFollowListItem.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetFollowListResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.items.push(GetFollowListItem.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			items: globalThis.Array.isArray(object?.items) ? object.items.map((e) => GetFollowListItem.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.items?.length) obj.items = message.items.map((e) => GetFollowListItem.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return GetFollowListResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetFollowListResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.items = object.items?.map((e) => GetFollowListItem.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseShareCheckRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		shareMark: "",
+		mediaId: void 0
+	};
+}
+const ShareCheckRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.shareMark !== "") writer.uint32(26).string(message.shareMark);
+		if (message.mediaId !== void 0) writer.uint32(32).int64(message.mediaId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseShareCheckRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.shareMark = reader.string();
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.mediaId = longToNumber$4(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			shareMark: isSet$6(object.shareMark) ? globalThis.String(object.shareMark) : "",
+			mediaId: isSet$6(object.mediaId) ? globalThis.Number(object.mediaId) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.shareMark !== "") obj.shareMark = message.shareMark;
+		if (message.mediaId !== void 0) obj.mediaId = Math.round(message.mediaId);
+		return obj;
+	},
+	create(base) {
+		return ShareCheckRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseShareCheckRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.shareMark = object.shareMark ?? "";
+		message.mediaId = object.mediaId ?? void 0;
+		return message;
+	}
+};
+function createBaseShareCheckResponse() {
+	return {
+		common: void 0,
+		shareMark: "",
+		mediaExists: false
+	};
+}
+const ShareCheckResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.shareMark !== "") writer.uint32(18).string(message.shareMark);
+		if (message.mediaExists !== false) writer.uint32(24).bool(message.mediaExists);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseShareCheckResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.shareMark = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.mediaExists = reader.bool();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			shareMark: isSet$6(object.shareMark) ? globalThis.String(object.shareMark) : "",
+			mediaExists: isSet$6(object.mediaExists) ? globalThis.Boolean(object.mediaExists) : false
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.shareMark !== "") obj.shareMark = message.shareMark;
+		if (message.mediaExists !== false) obj.mediaExists = message.mediaExists;
+		return obj;
+	},
+	create(base) {
+		return ShareCheckResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseShareCheckResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.shareMark = object.shareMark ?? "";
+		message.mediaExists = object.mediaExists ?? false;
 		return message;
 	}
 };
@@ -2380,11 +3661,11 @@ const ReportSessionCorruptRequest = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
-			openId: isSet$4(object.openId) ? globalThis.String(object.openId) : "",
-			expect: isSet$4(object.expect) ? globalThis.String(object.expect) : "",
-			actual: isSet$4(object.actual) ? globalThis.String(object.actual) : "",
-			page: isSet$4(object.page) ? globalThis.String(object.page) : ""
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			expect: isSet$6(object.expect) ? globalThis.String(object.expect) : "",
+			actual: isSet$6(object.actual) ? globalThis.String(object.actual) : "",
+			page: isSet$6(object.page) ? globalThis.String(object.page) : ""
 		};
 	},
 	toJSON(message) {
@@ -2451,8 +3732,8 @@ const ReportSessionCorruptResponse = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet$4(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
-			shareMark: isSet$4(object.shareMark) ? globalThis.String(object.shareMark) : ""
+			common: isSet$6(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			shareMark: isSet$6(object.shareMark) ? globalThis.String(object.shareMark) : ""
 		};
 	},
 	toJSON(message) {
@@ -2471,7 +3752,13 @@ const ReportSessionCorruptResponse = {
 		return message;
 	}
 };
-function isSet$4(value) {
+function longToNumber$4(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
+function isSet$6(value) {
 	return value !== null && value !== void 0;
 }
 //#endregion
@@ -2559,11 +3846,11 @@ const OpenApp = {
 	},
 	fromJSON(object) {
 		return {
-			path: isSet$3(object.path) ? globalThis.String(object.path) : void 0,
-			scene: isSet$3(object.scene) ? globalThis.Number(object.scene) : void 0,
-			chatType: isSet$3(object.chatType) ? globalThis.Number(object.chatType) : void 0,
-			groupEncryptedData: isSet$3(object.groupEncryptedData) ? globalThis.String(object.groupEncryptedData) : void 0,
-			groupIv: isSet$3(object.groupIv) ? globalThis.String(object.groupIv) : void 0
+			path: isSet$5(object.path) ? globalThis.String(object.path) : void 0,
+			scene: isSet$5(object.scene) ? globalThis.Number(object.scene) : void 0,
+			chatType: isSet$5(object.chatType) ? globalThis.Number(object.chatType) : void 0,
+			groupEncryptedData: isSet$5(object.groupEncryptedData) ? globalThis.String(object.groupEncryptedData) : void 0,
+			groupIv: isSet$5(object.groupIv) ? globalThis.String(object.groupIv) : void 0
 		};
 	},
 	toJSON(message) {
@@ -2705,8 +3992,8 @@ const OpenPage_ParamsEntry = {
 	},
 	fromJSON(object) {
 		return {
-			key: isSet$3(object.key) ? globalThis.String(object.key) : "",
-			value: isSet$3(object.value) ? globalThis.String(object.value) : ""
+			key: isSet$5(object.key) ? globalThis.String(object.key) : "",
+			value: isSet$5(object.value) ? globalThis.String(object.value) : ""
 		};
 	},
 	toJSON(message) {
@@ -2754,7 +4041,7 @@ const ShareVideo = {
 				switch (tag >>> 3) {
 					case 1:
 						if (tag !== 8) break;
-						message.mediaId = longToNumber$1(reader.int64());
+						message.mediaId = longToNumber$3(reader.int64());
 						continue;
 					case 2:
 						if (tag !== 18) break;
@@ -2779,10 +4066,10 @@ const ShareVideo = {
 	},
 	fromJSON(object) {
 		return {
-			mediaId: isSet$3(object.mediaId) ? globalThis.Number(object.mediaId) : void 0,
-			shareId: isSet$3(object.shareId) ? globalThis.String(object.shareId) : "",
-			miniAppFrom: isSet$3(object.miniAppFrom) ? globalThis.String(object.miniAppFrom) : void 0,
-			shareTarget: isSet$3(object.shareTarget) ? globalThis.String(object.shareTarget) : ""
+			mediaId: isSet$5(object.mediaId) ? globalThis.Number(object.mediaId) : void 0,
+			shareId: isSet$5(object.shareId) ? globalThis.String(object.shareId) : "",
+			miniAppFrom: isSet$5(object.miniAppFrom) ? globalThis.String(object.miniAppFrom) : void 0,
+			shareTarget: isSet$5(object.shareTarget) ? globalThis.String(object.shareTarget) : ""
 		};
 	},
 	toJSON(message) {
@@ -2830,7 +4117,7 @@ const ReportMedia = {
 				switch (tag >>> 3) {
 					case 1:
 						if (tag !== 8) break;
-						message.mediaId = longToNumber$1(reader.int64());
+						message.mediaId = longToNumber$3(reader.int64());
 						continue;
 					case 2:
 						if (tag !== 18) break;
@@ -2847,8 +4134,8 @@ const ReportMedia = {
 	},
 	fromJSON(object) {
 		return {
-			mediaId: isSet$3(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
-			reason: isSet$3(object.reason) ? globalThis.String(object.reason) : ""
+			mediaId: isSet$5(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			reason: isSet$5(object.reason) ? globalThis.String(object.reason) : ""
 		};
 	},
 	toJSON(message) {
@@ -2867,7 +4154,7 @@ const ReportMedia = {
 		return message;
 	}
 };
-function longToNumber$1(int64) {
+function longToNumber$3(int64) {
 	const num = globalThis.Number(int64.toString());
 	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
 	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
@@ -2876,7 +4163,7 @@ function longToNumber$1(int64) {
 function isObject(value) {
 	return typeof value === "object" && value !== null;
 }
-function isSet$3(value) {
+function isSet$5(value) {
 	return value !== null && value !== void 0;
 }
 //#endregion
@@ -2902,7 +4189,7 @@ const VideoView = {
 				switch (tag >>> 3) {
 					case 1:
 						if (tag !== 8) break;
-						message.mediaId = longToNumber(reader.int64());
+						message.mediaId = longToNumber$2(reader.int64());
 						continue;
 				}
 				if ((tag & 7) === 4 || tag === 0) break;
@@ -2914,7 +4201,7 @@ const VideoView = {
 		}
 	},
 	fromJSON(object) {
-		return { mediaId: isSet$2(object.mediaId) ? globalThis.Number(object.mediaId) : 0 };
+		return { mediaId: isSet$4(object.mediaId) ? globalThis.Number(object.mediaId) : 0 };
 	},
 	toJSON(message) {
 		const obj = {};
@@ -2955,7 +4242,7 @@ const VideoViewFinish = {
 				switch (tag >>> 3) {
 					case 1:
 						if (tag !== 8) break;
-						message.mediaId = longToNumber(reader.int64());
+						message.mediaId = longToNumber$2(reader.int64());
 						continue;
 					case 2:
 						if (tag !== 16) break;
@@ -2972,8 +4259,8 @@ const VideoViewFinish = {
 	},
 	fromJSON(object) {
 		return {
-			mediaId: isSet$2(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
-			complete: isSet$2(object.complete) ? globalThis.Boolean(object.complete) : false
+			mediaId: isSet$4(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			complete: isSet$4(object.complete) ? globalThis.Boolean(object.complete) : false
 		};
 	},
 	toJSON(message) {
@@ -2992,13 +4279,13 @@ const VideoViewFinish = {
 		return message;
 	}
 };
-function longToNumber(int64) {
+function longToNumber$2(int64) {
 	const num = globalThis.Number(int64.toString());
 	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
 	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
 	return num;
 }
-function isSet$2(value) {
+function isSet$4(value) {
 	return value !== null && value !== void 0;
 }
 //#endregion
@@ -3075,13 +4362,13 @@ const CombinedLog = {
 	},
 	fromJSON(object) {
 		return {
-			base: isSet$1(object.base) ? BaseLogInfo.fromJSON(object.base) : void 0,
-			openApp: isSet$1(object.openApp) ? OpenApp.fromJSON(object.openApp) : void 0,
-			openPage: isSet$1(object.openPage) ? OpenPage.fromJSON(object.openPage) : void 0,
-			videoView: isSet$1(object.videoView) ? VideoView.fromJSON(object.videoView) : void 0,
-			videoViewFinish: isSet$1(object.videoViewFinish) ? VideoViewFinish.fromJSON(object.videoViewFinish) : void 0,
-			shareVideo: isSet$1(object.shareVideo) ? ShareVideo.fromJSON(object.shareVideo) : void 0,
-			reportMedia: isSet$1(object.reportMedia) ? ReportMedia.fromJSON(object.reportMedia) : void 0
+			base: isSet$3(object.base) ? BaseLogInfo.fromJSON(object.base) : void 0,
+			openApp: isSet$3(object.openApp) ? OpenApp.fromJSON(object.openApp) : void 0,
+			openPage: isSet$3(object.openPage) ? OpenPage.fromJSON(object.openPage) : void 0,
+			videoView: isSet$3(object.videoView) ? VideoView.fromJSON(object.videoView) : void 0,
+			videoViewFinish: isSet$3(object.videoViewFinish) ? VideoViewFinish.fromJSON(object.videoViewFinish) : void 0,
+			shareVideo: isSet$3(object.shareVideo) ? ShareVideo.fromJSON(object.shareVideo) : void 0,
+			reportMedia: isSet$3(object.reportMedia) ? ReportMedia.fromJSON(object.reportMedia) : void 0
 		};
 	},
 	toJSON(message) {
@@ -3158,9 +4445,9 @@ const BaseLogInfo = {
 	},
 	fromJSON(object) {
 		return {
-			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
-			session: isSet$1(object.session) ? globalThis.String(object.session) : "",
-			page: isSet$1(object.page) ? globalThis.String(object.page) : ""
+			openId: isSet$3(object.openId) ? globalThis.String(object.openId) : "",
+			session: isSet$3(object.session) ? globalThis.String(object.session) : "",
+			page: isSet$3(object.page) ? globalThis.String(object.page) : ""
 		};
 	},
 	toJSON(message) {
@@ -3181,7 +4468,7 @@ const BaseLogInfo = {
 		return message;
 	}
 };
-function isSet$1(value) {
+function isSet$3(value) {
 	return value !== null && value !== void 0;
 }
 //#endregion
@@ -3228,7 +4515,7 @@ const LogReportRequest = {
 	},
 	fromJSON(object) {
 		return {
-			common: isSet(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			common: isSet$2(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
 			batch: globalThis.Array.isArray(object?.batch) ? object.batch.map((e) => CombinedLog.fromJSON(e)) : []
 		};
 	},
@@ -3248,7 +4535,7 @@ const LogReportRequest = {
 		return message;
 	}
 };
-function isSet(value) {
+function isSet$2(value) {
 	return value !== null && value !== void 0;
 }
 //#endregion
@@ -3263,6 +4550,7 @@ var ApiReportLog = class extends BaseApi {
 		await this.reportLog({ batch: await batch });
 	}
 	reportLog({ batch }) {
+		console.log("reportLog", batch);
 		return this.invokeProtoApi({
 			method: "PUT",
 			path: "/media-hub/report/log",
@@ -3324,21 +4612,1902 @@ var ApiAuth = class extends BaseApi {
 	}
 };
 //#endregion
+//#region src/models/client/api/media.ts
+function createBaseRankScoreRecommendRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		count: 0,
+		topId: void 0,
+		excludeId: void 0
+	};
+}
+const RankScoreRecommendRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.count !== 0) writer.uint32(24).int32(message.count);
+		if (message.topId !== void 0) writer.uint32(32).int64(message.topId);
+		if (message.excludeId !== void 0) writer.uint32(40).int64(message.excludeId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseRankScoreRecommendRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.count = reader.int32();
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.topId = longToNumber$1(reader.int64());
+						continue;
+					case 5:
+						if (tag !== 40) break;
+						message.excludeId = longToNumber$1(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			count: isSet$1(object.count) ? globalThis.Number(object.count) : 0,
+			topId: isSet$1(object.topId) ? globalThis.Number(object.topId) : void 0,
+			excludeId: isSet$1(object.excludeId) ? globalThis.Number(object.excludeId) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.count !== 0) obj.count = Math.round(message.count);
+		if (message.topId !== void 0) obj.topId = Math.round(message.topId);
+		if (message.excludeId !== void 0) obj.excludeId = Math.round(message.excludeId);
+		return obj;
+	},
+	create(base) {
+		return RankScoreRecommendRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseRankScoreRecommendRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.count = object.count ?? 0;
+		message.topId = object.topId ?? void 0;
+		message.excludeId = object.excludeId ?? void 0;
+		return message;
+	}
+};
+function createBaseRankScoreRecommendResponse() {
+	return {
+		common: void 0,
+		media: []
+	};
+}
+const RankScoreRecommendResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.media) MediaAsset.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseRankScoreRecommendResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.media.push(MediaAsset.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			media: globalThis.Array.isArray(object?.media) ? object.media.map((e) => MediaAsset.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.media?.length) obj.media = message.media.map((e) => MediaAsset.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return RankScoreRecommendResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseRankScoreRecommendResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.media = object.media?.map((e) => MediaAsset.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseFavoriteOperationRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		mediaId: 0,
+		op: 0
+	};
+}
+const FavoriteOperationRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.mediaId !== 0) writer.uint32(24).int64(message.mediaId);
+		if (message.op !== 0) writer.uint32(32).int32(message.op);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseFavoriteOperationRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.mediaId = longToNumber$1(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.op = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			mediaId: isSet$1(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			op: isSet$1(object.op) ? addRemoveOpTypeFromJSON(object.op) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.mediaId !== 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.op !== 0) obj.op = addRemoveOpTypeToJSON(message.op);
+		return obj;
+	},
+	create(base) {
+		return FavoriteOperationRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseFavoriteOperationRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.mediaId = object.mediaId ?? 0;
+		message.op = object.op ?? 0;
+		return message;
+	}
+};
+function createBaseGetFavoriteRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		cursor: void 0,
+		count: 0
+	};
+}
+const GetFavoriteRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.cursor !== void 0) writer.uint32(24).int64(message.cursor);
+		if (message.count !== 0) writer.uint32(32).int32(message.count);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetFavoriteRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.cursor = longToNumber$1(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.count = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			cursor: isSet$1(object.cursor) ? globalThis.Number(object.cursor) : void 0,
+			count: isSet$1(object.count) ? globalThis.Number(object.count) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.cursor !== void 0) obj.cursor = Math.round(message.cursor);
+		if (message.count !== 0) obj.count = Math.round(message.count);
+		return obj;
+	},
+	create(base) {
+		return GetFavoriteRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetFavoriteRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.cursor = object.cursor ?? void 0;
+		message.count = object.count ?? 0;
+		return message;
+	}
+};
+function createBaseGetFavoriteResponse() {
+	return {
+		common: void 0,
+		cursor: 0,
+		media: []
+	};
+}
+const GetFavoriteResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.cursor !== 0) writer.uint32(16).int64(message.cursor);
+		for (const v of message.media) MediaAsset.encode(v, writer.uint32(26).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetFavoriteResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.cursor = longToNumber$1(reader.int64());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.media.push(MediaAsset.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			cursor: isSet$1(object.cursor) ? globalThis.Number(object.cursor) : 0,
+			media: globalThis.Array.isArray(object?.media) ? object.media.map((e) => MediaAsset.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.cursor !== 0) obj.cursor = Math.round(message.cursor);
+		if (message.media?.length) obj.media = message.media.map((e) => MediaAsset.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return GetFavoriteResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetFavoriteResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.cursor = object.cursor ?? 0;
+		message.media = object.media?.map((e) => MediaAsset.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseGetUserHotRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		upId: 0
+	};
+}
+const GetUserHotRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.upId !== 0) writer.uint32(24).int64(message.upId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetUserHotRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.upId = longToNumber$1(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			upId: isSet$1(object.upId) ? globalThis.Number(object.upId) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.upId !== 0) obj.upId = Math.round(message.upId);
+		return obj;
+	},
+	create(base) {
+		return GetUserHotRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetUserHotRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.upId = object.upId ?? 0;
+		return message;
+	}
+};
+function createBaseGetUserHotResponse() {
+	return {
+		common: void 0,
+		media: []
+	};
+}
+const GetUserHotResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.media) MediaAsset.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetUserHotResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.media.push(MediaAsset.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			media: globalThis.Array.isArray(object?.media) ? object.media.map((e) => MediaAsset.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.media?.length) obj.media = message.media.map((e) => MediaAsset.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return GetUserHotResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetUserHotResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.media = object.media?.map((e) => MediaAsset.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseCreateDraftRequest() {
+	return {
+		common: void 0,
+		openId: ""
+	};
+}
+const CreateDraftRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCreateDraftRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		return obj;
+	},
+	create(base) {
+		return CreateDraftRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCreateDraftRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		return message;
+	}
+};
+function createBaseCreateDraftResponse() {
+	return {
+		common: void 0,
+		id: 0
+	};
+}
+const CreateDraftResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.id !== 0) writer.uint32(16).int64(message.id);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseCreateDraftResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.id = longToNumber$1(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			id: isSet$1(object.id) ? globalThis.Number(object.id) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		return obj;
+	},
+	create(base) {
+		return CreateDraftResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseCreateDraftResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.id = object.id ?? 0;
+		return message;
+	}
+};
+function createBaseGetDraftMetaRequest() {
+	return {
+		common: void 0,
+		id: 0,
+		openId: ""
+	};
+}
+const GetDraftMetaRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.id !== 0) writer.uint32(16).int64(message.id);
+		if (message.openId !== "") writer.uint32(26).string(message.openId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetDraftMetaRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 16) break;
+						message.id = longToNumber$1(reader.int64());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.openId = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			id: isSet$1(object.id) ? globalThis.Number(object.id) : 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.openId !== "") obj.openId = message.openId;
+		return obj;
+	},
+	create(base) {
+		return GetDraftMetaRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetDraftMetaRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.id = object.id ?? 0;
+		message.openId = object.openId ?? "";
+		return message;
+	}
+};
+function createBaseGetDraftMetaResponse() {
+	return {
+		common: void 0,
+		cover: void 0,
+		video: void 0
+	};
+}
+const GetDraftMetaResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.cover !== void 0) OssPutMeta.encode(message.cover, writer.uint32(18).fork()).join();
+		if (message.video !== void 0) OssPutMeta.encode(message.video, writer.uint32(26).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetDraftMetaResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.cover = OssPutMeta.decode(reader, reader.uint32());
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.video = OssPutMeta.decode(reader, reader.uint32());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			cover: isSet$1(object.cover) ? OssPutMeta.fromJSON(object.cover) : void 0,
+			video: isSet$1(object.video) ? OssPutMeta.fromJSON(object.video) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.cover !== void 0) obj.cover = OssPutMeta.toJSON(message.cover);
+		if (message.video !== void 0) obj.video = OssPutMeta.toJSON(message.video);
+		return obj;
+	},
+	create(base) {
+		return GetDraftMetaResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetDraftMetaResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.cover = object.cover !== void 0 && object.cover !== null ? OssPutMeta.fromPartial(object.cover) : void 0;
+		message.video = object.video !== void 0 && object.video !== null ? OssPutMeta.fromPartial(object.video) : void 0;
+		return message;
+	}
+};
+function createBaseUpdateDraftRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		id: 0,
+		markCoverReady: void 0,
+		markVideoReady: void 0,
+		markReviewReady: void 0,
+		title: void 0,
+		drop: void 0
+	};
+}
+const UpdateDraftRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.id !== 0) writer.uint32(24).int64(message.id);
+		if (message.markCoverReady !== void 0) writer.uint32(32).bool(message.markCoverReady);
+		if (message.markVideoReady !== void 0) writer.uint32(40).bool(message.markVideoReady);
+		if (message.markReviewReady !== void 0) writer.uint32(48).bool(message.markReviewReady);
+		if (message.title !== void 0) writer.uint32(58).string(message.title);
+		if (message.drop !== void 0) writer.uint32(64).bool(message.drop);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseUpdateDraftRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.id = longToNumber$1(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.markCoverReady = reader.bool();
+						continue;
+					case 5:
+						if (tag !== 40) break;
+						message.markVideoReady = reader.bool();
+						continue;
+					case 6:
+						if (tag !== 48) break;
+						message.markReviewReady = reader.bool();
+						continue;
+					case 7:
+						if (tag !== 58) break;
+						message.title = reader.string();
+						continue;
+					case 8:
+						if (tag !== 64) break;
+						message.drop = reader.bool();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			id: isSet$1(object.id) ? globalThis.Number(object.id) : 0,
+			markCoverReady: isSet$1(object.markCoverReady) ? globalThis.Boolean(object.markCoverReady) : void 0,
+			markVideoReady: isSet$1(object.markVideoReady) ? globalThis.Boolean(object.markVideoReady) : void 0,
+			markReviewReady: isSet$1(object.markReviewReady) ? globalThis.Boolean(object.markReviewReady) : void 0,
+			title: isSet$1(object.title) ? globalThis.String(object.title) : void 0,
+			drop: isSet$1(object.drop) ? globalThis.Boolean(object.drop) : void 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.markCoverReady !== void 0) obj.markCoverReady = message.markCoverReady;
+		if (message.markVideoReady !== void 0) obj.markVideoReady = message.markVideoReady;
+		if (message.markReviewReady !== void 0) obj.markReviewReady = message.markReviewReady;
+		if (message.title !== void 0) obj.title = message.title;
+		if (message.drop !== void 0) obj.drop = message.drop;
+		return obj;
+	},
+	create(base) {
+		return UpdateDraftRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseUpdateDraftRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.id = object.id ?? 0;
+		message.markCoverReady = object.markCoverReady ?? void 0;
+		message.markVideoReady = object.markVideoReady ?? void 0;
+		message.markReviewReady = object.markReviewReady ?? void 0;
+		message.title = object.title ?? void 0;
+		message.drop = object.drop ?? void 0;
+		return message;
+	}
+};
+function createBaseListDraftRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		cursor: void 0,
+		count: 0
+	};
+}
+const ListDraftRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.cursor !== void 0) writer.uint32(24).int64(message.cursor);
+		if (message.count !== 0) writer.uint32(32).int32(message.count);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseListDraftRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.cursor = longToNumber$1(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.count = reader.int32();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : "",
+			cursor: isSet$1(object.cursor) ? globalThis.Number(object.cursor) : void 0,
+			count: isSet$1(object.count) ? globalThis.Number(object.count) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.cursor !== void 0) obj.cursor = Math.round(message.cursor);
+		if (message.count !== 0) obj.count = Math.round(message.count);
+		return obj;
+	},
+	create(base) {
+		return ListDraftRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseListDraftRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.cursor = object.cursor ?? void 0;
+		message.count = object.count ?? 0;
+		return message;
+	}
+};
+function createBaseListDraftResponse() {
+	return {
+		common: void 0,
+		draft: []
+	};
+}
+const ListDraftResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.draft) DraftAsset.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseListDraftResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.draft.push(DraftAsset.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			draft: globalThis.Array.isArray(object?.draft) ? object.draft.map((e) => DraftAsset.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.draft?.length) obj.draft = message.draft.map((e) => DraftAsset.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return ListDraftResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseListDraftResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.draft = object.draft?.map((e) => DraftAsset.fromPartial(e)) || [];
+		return message;
+	}
+};
+function createBaseGetArticleRequest() {
+	return {
+		common: void 0,
+		openId: ""
+	};
+}
+const GetArticleRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetArticleRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$1(object.openId) ? globalThis.String(object.openId) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		return obj;
+	},
+	create(base) {
+		return GetArticleRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetArticleRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		return message;
+	}
+};
+function createBaseGetArticleResponse() {
+	return {
+		common: void 0,
+		article: []
+	};
+}
+const GetArticleResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		for (const v of message.article) Article$1.encode(v, writer.uint32(18).fork()).join();
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseGetArticleResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.article.push(Article$1.decode(reader, reader.uint32()));
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			article: globalThis.Array.isArray(object?.article) ? object.article.map((e) => Article$1.fromJSON(e)) : []
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.article?.length) obj.article = message.article.map((e) => Article$1.toJSON(e));
+		return obj;
+	},
+	create(base) {
+		return GetArticleResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseGetArticleResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.article = object.article?.map((e) => Article$1.fromPartial(e)) || [];
+		return message;
+	}
+};
+function longToNumber$1(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
+function isSet$1(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/apis/api_media.ts
+var ApiMedia = class extends BaseApi {
+	async recommendByRankScore({ openId, topId, excludeId, count = 10, name = "hot" }) {
+		return this.invokeProtoApi({
+			path: `/media-hub/recommend/rank/${encodeURIComponent(name)}`,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				count: Math.min(Math.max(count, 1), 10),
+				topId,
+				excludeId
+			},
+			requestMeta: RankScoreRecommendRequest,
+			responseMeta: RankScoreRecommendResponse,
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.media ?? []
+			}
+		});
+	}
+	async favoriteOp({ openId, mediaId, op }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/favorite-op",
+			requestMeta: FavoriteOperationRequest,
+			responseMeta: CommonResponseData,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				mediaId,
+				op
+			},
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
+	}
+	async getFavorite({ openId, cursor, count = 20 }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/get-favorite",
+			requestMeta: GetFavoriteRequest,
+			responseMeta: GetFavoriteResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				cursor,
+				count
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({
+					cursor: response.cursor,
+					media: response.media
+				})
+			}
+		});
+	}
+	async createDraft({ openId }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/create-draft",
+			requestMeta: CreateDraftRequest,
+			responseMeta: CreateDraftResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.id
+			}
+		});
+	}
+	async updateDraft({ openId, draftId, markCoverReady, markVideoReady, markReviewReady, title, drop }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/update-draft",
+			requestMeta: UpdateDraftRequest,
+			responseMeta: CommonResponseData,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				id: draftId,
+				markCoverReady,
+				markVideoReady,
+				markReviewReady,
+				title,
+				drop
+			},
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
+	}
+	async getDraftMeta({ openId, draftId }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/get-draft-meta",
+			requestMeta: GetDraftMetaRequest,
+			responseMeta: GetDraftMetaResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				id: draftId
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({
+					cover: response.cover,
+					video: response.video
+				})
+			}
+		});
+	}
+	async listDraft({ openId, cursor, count = 10 }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/list-draft",
+			requestMeta: ListDraftRequest,
+			responseMeta: ListDraftResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				cursor,
+				count
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.draft
+			}
+		});
+	}
+	async getArticle({ openId }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/media/get-article",
+			requestMeta: GetArticleRequest,
+			responseMeta: GetArticleResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.article ?? []
+			}
+		});
+	}
+};
+//#endregion
+//#region src/apis/api_user.ts
+var ApiUser = class extends BaseApi {
+	async userUpdateInfo({ openId, nickname, avatar }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/update-info",
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				nickname,
+				avatar
+			},
+			requestMeta: UpdateUserInfoRequest,
+			responseMeta: CommonResponseData,
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
+	}
+	async getUserInfo(query) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/get-info",
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				...query
+			},
+			requestMeta: GetUserInfoRequest,
+			responseMeta: GetUserInfoResponse,
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.info
+			}
+		});
+	}
+	async followOp({ openId, upId, op }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/follow-op",
+			requestMeta: FollowOpRequest,
+			responseMeta: CommonResponseData,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				upId,
+				op
+			},
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
+	}
+	addFollow({ openId, upId }) {
+		return this.followOp({
+			openId,
+			upId,
+			op: 0
+		});
+	}
+	removeFollow({ openId, upId }) {
+		return this.followOp({
+			openId,
+			upId,
+			op: 1
+		});
+	}
+	async getHot({ openId, upId }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/get-user-hot",
+			requestMeta: GetUserHotRequest,
+			responseMeta: GetUserHotResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				upId
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.media
+			}
+		});
+	}
+	async checkIsFan(props) {
+		const { openId, ...query } = props;
+		return this.invokeProtoApi({
+			path: "/media-hub/user/check-is-fan",
+			requestMeta: CheckIsFanRequest,
+			responseMeta: CheckIsFanResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				...query
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.isFan
+			}
+		});
+	}
+	async getFollowList({ openId, cursor, count, hotCount }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/get-follow-list",
+			requestMeta: GetFollowListRequest,
+			responseMeta: GetFollowListResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				cursor,
+				count,
+				hotCount
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.items
+			}
+		});
+	}
+	async shareCheck({ openId, media, shareMark }) {
+		const { shareMark: updateShareMark, mediaExists } = await this.invokeProtoApi({
+			path: "/media-hub/user/share-check",
+			requestMeta: ShareCheckRequest,
+			responseMeta: ShareCheckResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				mediaId: media,
+				shareMark: shareMark ?? ""
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => ({
+					shareMark: response.shareMark,
+					mediaExists: response.mediaExists
+				})
+			}
+		});
+		this.updateCachedShareMark(updateShareMark);
+		return {
+			shareMark: updateShareMark,
+			mediaExists
+		};
+	}
+};
+//#endregion
+//#region src/models/client/api/ad.ts
+function createBaseAd() {
+	return {
+		id: 0,
+		materialType: "",
+		materialUrl: "",
+		webpageUrl: ""
+	};
+}
+const Ad = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.id !== 0) writer.uint32(8).int64(message.id);
+		if (message.materialType !== "") writer.uint32(18).string(message.materialType);
+		if (message.materialUrl !== "") writer.uint32(26).string(message.materialUrl);
+		if (message.webpageUrl !== "") writer.uint32(34).string(message.webpageUrl);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseAd();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 8) break;
+						message.id = longToNumber(reader.int64());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.materialType = reader.string();
+						continue;
+					case 3:
+						if (tag !== 26) break;
+						message.materialUrl = reader.string();
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.webpageUrl = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			id: isSet(object.id) ? globalThis.Number(object.id) : 0,
+			materialType: isSet(object.materialType) ? globalThis.String(object.materialType) : "",
+			materialUrl: isSet(object.materialUrl) ? globalThis.String(object.materialUrl) : "",
+			webpageUrl: isSet(object.webpageUrl) ? globalThis.String(object.webpageUrl) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.id !== 0) obj.id = Math.round(message.id);
+		if (message.materialType !== "") obj.materialType = message.materialType;
+		if (message.materialUrl !== "") obj.materialUrl = message.materialUrl;
+		if (message.webpageUrl !== "") obj.webpageUrl = message.webpageUrl;
+		return obj;
+	},
+	create(base) {
+		return Ad.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseAd();
+		message.id = object.id ?? 0;
+		message.materialType = object.materialType ?? "";
+		message.materialUrl = object.materialUrl ?? "";
+		message.webpageUrl = object.webpageUrl ?? "";
+		return message;
+	}
+};
+function createBaseObtainAdRequest() {
+	return {
+		common: void 0,
+		openId: ""
+	};
+}
+const ObtainAdRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseObtainAdRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet(object.openId) ? globalThis.String(object.openId) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		return obj;
+	},
+	create(base) {
+		return ObtainAdRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseObtainAdRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		return message;
+	}
+};
+function createBaseObtainAdResponse() {
+	return {
+		common: void 0,
+		ad: void 0,
+		historyId: 0
+	};
+}
+const ObtainAdResponse = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.ad !== void 0) Ad.encode(message.ad, writer.uint32(18).fork()).join();
+		if (message.historyId !== 0) writer.uint32(24).int64(message.historyId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseObtainAdResponse();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonResponseData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.ad = Ad.decode(reader, reader.uint32());
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.historyId = longToNumber(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
+			ad: isSet(object.ad) ? Ad.fromJSON(object.ad) : void 0,
+			historyId: isSet(object.historyId) ? globalThis.Number(object.historyId) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
+		if (message.ad !== void 0) obj.ad = Ad.toJSON(message.ad);
+		if (message.historyId !== 0) obj.historyId = Math.round(message.historyId);
+		return obj;
+	},
+	create(base) {
+		return ObtainAdResponse.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseObtainAdResponse();
+		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
+		message.ad = object.ad !== void 0 && object.ad !== null ? Ad.fromPartial(object.ad) : void 0;
+		message.historyId = object.historyId ?? 0;
+		return message;
+	}
+};
+function createBaseMarkAdExposeRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		adId: 0,
+		historyId: 0
+	};
+}
+const MarkAdExposeRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.adId !== 0) writer.uint32(24).int64(message.adId);
+		if (message.historyId !== 0) writer.uint32(32).int64(message.historyId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseMarkAdExposeRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.adId = longToNumber(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.historyId = longToNumber(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet(object.openId) ? globalThis.String(object.openId) : "",
+			adId: isSet(object.adId) ? globalThis.Number(object.adId) : 0,
+			historyId: isSet(object.historyId) ? globalThis.Number(object.historyId) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.adId !== 0) obj.adId = Math.round(message.adId);
+		if (message.historyId !== 0) obj.historyId = Math.round(message.historyId);
+		return obj;
+	},
+	create(base) {
+		return MarkAdExposeRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseMarkAdExposeRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.adId = object.adId ?? 0;
+		message.historyId = object.historyId ?? 0;
+		return message;
+	}
+};
+function createBaseMarkAdConvertRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		adId: 0,
+		historyId: 0
+	};
+}
+const MarkAdConvertRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.adId !== 0) writer.uint32(24).int64(message.adId);
+		if (message.historyId !== 0) writer.uint32(32).int64(message.historyId);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseMarkAdConvertRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.adId = longToNumber(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 32) break;
+						message.historyId = longToNumber(reader.int64());
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet(object.openId) ? globalThis.String(object.openId) : "",
+			adId: isSet(object.adId) ? globalThis.Number(object.adId) : 0,
+			historyId: isSet(object.historyId) ? globalThis.Number(object.historyId) : 0
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.adId !== 0) obj.adId = Math.round(message.adId);
+		if (message.historyId !== 0) obj.historyId = Math.round(message.historyId);
+		return obj;
+	},
+	create(base) {
+		return MarkAdConvertRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseMarkAdConvertRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.adId = object.adId ?? 0;
+		message.historyId = object.historyId ?? 0;
+		return message;
+	}
+};
+function longToNumber(int64) {
+	const num = globalThis.Number(int64.toString());
+	if (num > globalThis.Number.MAX_SAFE_INTEGER) throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+	if (num < globalThis.Number.MIN_SAFE_INTEGER) throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+	return num;
+}
+function isSet(value) {
+	return value !== null && value !== void 0;
+}
+//#endregion
+//#region src/apis/api_ad.ts
+var ApiAd = class extends BaseApi {
+	async getAd({ openId }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/ad/get-ad",
+			requestMeta: ObtainAdRequest,
+			responseMeta: ObtainAdResponse,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId
+			},
+			extractor: {
+				commonOf: (response) => response.common,
+				bodyOf: (response) => response.ad ?? null
+			}
+		});
+	}
+	async markAdExpose({ openId, adId, historyId }) {
+		return this.invokeNoOutputProtoApi({
+			path: "/media-hub/ad/mark-expose",
+			requestMeta: MarkAdExposeRequest,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				adId,
+				historyId
+			}
+		});
+	}
+	async markAdConvert({ openId, adId, historyId }) {
+		return this.invokeNoOutputProtoApi({
+			path: "/media-hub/ad/mark-convert",
+			requestMeta: MarkAdConvertRequest,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				adId,
+				historyId
+			}
+		});
+	}
+};
+//#endregion
 //#region src/index.ts
-let textEncodingConfigured = false;
 const Media = MediaAsset;
-var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt) {
+const Article = Article$1;
+var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt, ApiMedia, ApiUser, ApiAd) {
 	constructor(appId, base, network) {
-		if (!textEncodingConfigured) Api.configureCustomUtf8();
 		super(appId, base, network);
-	}
-	static configureLegacyUtf8() {
-		textEncodingConfigured = true;
-		configureTextEncoding(new LegacyUtf8TextEncoding());
-	}
-	static configureCustomUtf8() {
-		textEncodingConfigured = true;
-		configureTextEncoding(new Utf8TextEncoding());
 	}
 	static createFetch(appId, base) {
 		return new Api(appId, base, new FetchNetwork());
@@ -3348,6 +6517,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api, Media };
+export { Api, Article, Media };
 
 //# sourceMappingURL=index.js.map

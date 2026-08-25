@@ -13,7 +13,7 @@
     </view>
     <view class="tab">
         <view wx:for="{{tabs}}" wx:key="tab" class="item" bind:tap="onTapTab" data-tab="{{item.tab}}">
-            <image class="icon" src="{{item.tab === currentTab ? item.activeIcon : item.inactiveIcon}}"/>
+            <image class="icon" mode="aspectFit" src="{{item.tab === currentTab ? item.activeIcon : item.inactiveIcon}}"/>
             <view class="name">{{item.name}}</view>
         </view>
     </view>

@@ -1,0 +1,23 @@
+@keyframes loading-anim-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.anim {
+  width: var(--size);
+  height: var(--size);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+
+  animation-name: loading-anim-rotate;
+  animation-duration: 0.7s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}

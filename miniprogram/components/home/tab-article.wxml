@@ -1,2 +1,21 @@
-<!--components/home/tab-article.wxml-->
-<text>components/home/tab-article.wxml</text>
+<view wx:if="{{fetching}}" class="hint">
+    <spin-anim/>
+</view>
+<view wx:if="{{!fetching && fetched && articles.length === 0}}" class="hint">
+    <text>还没有任何美文发布</text>
+</view>
+<scroll-view
+        wx:if="{{!fetching && fetched && articles.length > 0}}"
+        class="container"
+        scroll-y
+        type="custom"
+        enhanced="{{true}}"
+        show-scrollbar="{{false}}">
+    <view wx:for="{{articles}}" class="article">
+        <image class="cover" mode="aspectFill" src="{{item.image}}"/>
+        <view class="content">
+            <text class="title">{{item.title}}</text>
+            <text class="brief">{{item.brief}}</text>
+        </view>
+    </view>
+</scroll-view>

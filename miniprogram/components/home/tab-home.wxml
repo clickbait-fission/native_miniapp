@@ -1,14 +1,19 @@
 <scroll-view
         class="container"
         style="{{dynamicStyle}}"
-        type="custom"
         scroll-y
+        type="custom"
+        enhanced="{{true}}"
+        show-scrollbar="{{false}}"
         bind:scroll="onScroll">
     <view class="root">
         <view class="top-space"/>
-        <view wx:for="{{shownMedias}}" wx:key="id" class="card">
+        <view wx:for="{{shownMedias}}" wx:key="key" class="card">
             <media-brief media="{{item}}"/>
         </view>
         <view class="bottom-space"/>
+        <view class="hint">
+            <text>{{hint}}</text>
+        </view>
     </view>
 </scroll-view>

@@ -273,6 +273,11 @@ declare enum ResponseStatus {
   BadRequest = 2,
   UNRECOGNIZED = -1
 }
+declare enum AddRemoveOpType {
+  Add = 0,
+  Remove = 1,
+  UNRECOGNIZED = -1
+}
 interface CommonApiData {
   /** 服务端配置的id 不是微信appId */
   appId: number;
@@ -296,20 +301,44 @@ interface MediaAsset {
   isFavorite: boolean;
   banned: boolean;
 }
-declare const CommonApiData: MessageFns$3<CommonApiData>;
-declare const CommonResponseData: MessageFns$3<CommonResponseData>;
-declare const MediaAsset: MessageFns$3<MediaAsset>;
-type Builtin$3 = Date | Function | Uint8Array | string | number | boolean | undefined;
-type DeepPartial$3<T> = T extends Builtin$3 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$3<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$3<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$3<T[K]>; } : Partial<T>;
-type KeysOfUnion$3<T> = T extends T ? keyof T : never;
-type Exact$3<P, I extends P> = P extends Builtin$3 ? P : P & { [K in keyof P]: Exact$3<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$3<P>>]: never; };
-interface MessageFns$3<T> {
+interface OssPutMeta {
+  url: string;
+  form: {
+    [key: string]: string;
+  };
+}
+interface DraftAsset {
+  id: number;
+  mediaId?: number | undefined;
+  url?: string | undefined;
+  cover?: string | undefined;
+  title: string;
+  approved: boolean;
+  rejectReason?: string | undefined;
+}
+interface Article$1 {
+  address: string;
+  image: string;
+  title: string;
+  brief: string;
+}
+declare const CommonApiData: MessageFns$5<CommonApiData>;
+declare const CommonResponseData: MessageFns$5<CommonResponseData>;
+declare const MediaAsset: MessageFns$5<MediaAsset>;
+declare const OssPutMeta: MessageFns$5<OssPutMeta>;
+declare const DraftAsset: MessageFns$5<DraftAsset>;
+declare const Article$1: MessageFns$5<Article$1>;
+type Builtin$5 = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial$5<T> = T extends Builtin$5 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$5<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$5<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$5<T[K]>; } : Partial<T>;
+type KeysOfUnion$5<T> = T extends T ? keyof T : never;
+type Exact$5<P, I extends P> = P extends Builtin$5 ? P : P & { [K in keyof P]: Exact$5<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$5<P>>]: never; };
+interface MessageFns$5<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;
   toJSON(message: T): unknown;
-  create<I extends Exact$3<DeepPartial$3<T>, I>>(base?: I): T;
-  fromPartial<I extends Exact$3<DeepPartial$3<T>, I>>(object: I): T;
+  create<I extends Exact$5<DeepPartial$5<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact$5<DeepPartial$5<T>, I>>(object: I): T;
 }
 //#endregion
 //#region node_modules/ts-mixer/dist/types/types.d.ts
@@ -343,19 +372,19 @@ interface VideoViewFinish {
   mediaId: number;
   complete: boolean;
 }
-declare const VideoView: MessageFns$2<VideoView>;
-declare const VideoViewFinish: MessageFns$2<VideoViewFinish>;
-type Builtin$2 = Date | Function | Uint8Array | string | number | boolean | undefined;
-type DeepPartial$2<T> = T extends Builtin$2 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$2<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$2<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$2<T[K]>; } : Partial<T>;
-type KeysOfUnion$2<T> = T extends T ? keyof T : never;
-type Exact$2<P, I extends P> = P extends Builtin$2 ? P : P & { [K in keyof P]: Exact$2<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$2<P>>]: never; };
-interface MessageFns$2<T> {
+declare const VideoView: MessageFns$4<VideoView>;
+declare const VideoViewFinish: MessageFns$4<VideoViewFinish>;
+type Builtin$4 = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial$4<T> = T extends Builtin$4 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$4<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$4<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$4<T[K]>; } : Partial<T>;
+type KeysOfUnion$4<T> = T extends T ? keyof T : never;
+type Exact$4<P, I extends P> = P extends Builtin$4 ? P : P & { [K in keyof P]: Exact$4<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$4<P>>]: never; };
+interface MessageFns$4<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;
   toJSON(message: T): unknown;
-  create<I extends Exact$2<DeepPartial$2<T>, I>>(base?: I): T;
-  fromPartial<I extends Exact$2<DeepPartial$2<T>, I>>(object: I): T;
+  create<I extends Exact$4<DeepPartial$4<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact$4<DeepPartial$4<T>, I>>(object: I): T;
 }
 //#endregion
 //#region src/models/client/log/activity.d.ts
@@ -381,21 +410,21 @@ interface ReportMedia {
   mediaId: number;
   reason: string;
 }
-declare const OpenApp: MessageFns$1<OpenApp>;
-declare const OpenPage: MessageFns$1<OpenPage>;
-declare const ShareVideo: MessageFns$1<ShareVideo>;
-declare const ReportMedia: MessageFns$1<ReportMedia>;
-type Builtin$1 = Date | Function | Uint8Array | string | number | boolean | undefined;
-type DeepPartial$1<T> = T extends Builtin$1 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$1<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$1<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$1<T[K]>; } : Partial<T>;
-type KeysOfUnion$1<T> = T extends T ? keyof T : never;
-type Exact$1<P, I extends P> = P extends Builtin$1 ? P : P & { [K in keyof P]: Exact$1<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$1<P>>]: never; };
-interface MessageFns$1<T> {
+declare const OpenApp: MessageFns$3<OpenApp>;
+declare const OpenPage: MessageFns$3<OpenPage>;
+declare const ShareVideo: MessageFns$3<ShareVideo>;
+declare const ReportMedia: MessageFns$3<ReportMedia>;
+type Builtin$3 = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial$3<T> = T extends Builtin$3 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$3<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$3<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$3<T[K]>; } : Partial<T>;
+type KeysOfUnion$3<T> = T extends T ? keyof T : never;
+type Exact$3<P, I extends P> = P extends Builtin$3 ? P : P & { [K in keyof P]: Exact$3<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$3<P>>]: never; };
+interface MessageFns$3<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;
   toJSON(message: T): unknown;
-  create<I extends Exact$1<DeepPartial$1<T>, I>>(base?: I): T;
-  fromPartial<I extends Exact$1<DeepPartial$1<T>, I>>(object: I): T;
+  create<I extends Exact$3<DeepPartial$3<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact$3<DeepPartial$3<T>, I>>(object: I): T;
 }
 //#endregion
 //#region src/models/client/log/combined.d.ts
@@ -413,19 +442,19 @@ interface BaseLogInfo {
   session: string;
   page: string;
 }
-declare const CombinedLog: MessageFns<CombinedLog>;
-declare const BaseLogInfo: MessageFns<BaseLogInfo>;
-type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
-type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]>; } : Partial<T>;
-type KeysOfUnion<T> = T extends T ? keyof T : never;
-type Exact<P, I extends P> = P extends Builtin ? P : P & { [K in keyof P]: Exact<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never; };
-interface MessageFns<T> {
+declare const CombinedLog: MessageFns$2<CombinedLog>;
+declare const BaseLogInfo: MessageFns$2<BaseLogInfo>;
+type Builtin$2 = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial$2<T> = T extends Builtin$2 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$2<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$2<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$2<T[K]>; } : Partial<T>;
+type KeysOfUnion$2<T> = T extends T ? keyof T : never;
+type Exact$2<P, I extends P> = P extends Builtin$2 ? P : P & { [K in keyof P]: Exact$2<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$2<P>>]: never; };
+interface MessageFns$2<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
   fromJSON(object: any): T;
   toJSON(message: T): unknown;
-  create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
-  fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+  create<I extends Exact$2<DeepPartial$2<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact$2<DeepPartial$2<T>, I>>(object: I): T;
 }
 //#endregion
 //#region src/apis/session.d.ts
@@ -493,6 +522,14 @@ declare class BaseApi extends BaseSessionManagement {
       bodyOf(response: ResponseType): BodyType;
     };
   }): Promise<BodyType>;
+  protected invokeNoOutputProtoApi<RequestType>(options: {
+    method?: HttpMethod;
+    path: string;
+    requestBody: RequestType;
+    requestMeta: {
+      encode(message: RequestType, writer?: BinaryWriter): BinaryWriter;
+    };
+  }): Promise<void>;
 }
 //#endregion
 //#region src/apis/api_report_session_corrupt.d.ts
@@ -525,17 +562,189 @@ declare class ApiAuth extends BaseApi {
   }): Promise<void>;
 }
 //#endregion
+//#region src/apis/api_media.d.ts
+type RankName = 'hot';
+declare class ApiMedia extends BaseApi {
+  recommendByRankScore({ openId, topId, excludeId, count, name }: {
+    openId: string;
+    topId?: number;
+    excludeId?: number;
+    count?: number;
+    name?: RankName | string;
+  }): Promise<MediaAsset[]>;
+  favoriteOp({ openId, mediaId, op }: {
+    openId: string;
+    mediaId: number;
+    op: AddRemoveOpType;
+  }): Promise<void>;
+  getFavorite({ openId, cursor, count }: {
+    openId: string;
+    cursor?: number;
+    count?: number;
+  }): Promise<{
+    cursor: number;
+    media: MediaAsset[];
+  }>;
+  createDraft({ openId }: {
+    openId: string;
+  }): Promise<number>;
+  updateDraft({ openId, draftId, markCoverReady, markVideoReady, markReviewReady, title, drop }: {
+    openId: string;
+    draftId: number;
+    markCoverReady?: boolean;
+    markVideoReady?: boolean;
+    markReviewReady?: boolean;
+    title?: string;
+    drop?: boolean;
+  }): Promise<void>;
+  getDraftMeta({ openId, draftId }: {
+    openId: string;
+    draftId: number;
+  }): Promise<{
+    cover: OssPutMeta | undefined;
+    video: OssPutMeta | undefined;
+  }>;
+  listDraft({ openId, cursor, count }: {
+    openId: string;
+    cursor?: number;
+    count?: number;
+  }): Promise<DraftAsset[]>;
+  getArticle({ openId }: {
+    openId: string;
+  }): Promise<Article$1[]>;
+}
+//#endregion
+//#region src/models/client/api/user.d.ts
+interface BasicUserInfo {
+  id: number;
+  nickname?: string | undefined;
+  avatar?: string | undefined;
+  videoCount: number;
+  videoViewCount: number;
+  fanCount: number;
+  followCount: number;
+}
+interface GetFollowListItem {
+  user: BasicUserInfo | undefined;
+  cursor: number;
+  hot: MediaAsset[];
+}
+declare const BasicUserInfo: MessageFns$1<BasicUserInfo>;
+declare const GetFollowListItem: MessageFns$1<GetFollowListItem>;
+type Builtin$1 = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial$1<T> = T extends Builtin$1 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$1<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$1<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$1<T[K]>; } : Partial<T>;
+type KeysOfUnion$1<T> = T extends T ? keyof T : never;
+type Exact$1<P, I extends P> = P extends Builtin$1 ? P : P & { [K in keyof P]: Exact$1<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion$1<P>>]: never; };
+interface MessageFns$1<T> {
+  encode(message: T, writer?: BinaryWriter): BinaryWriter;
+  decode(input: BinaryReader | Uint8Array, length?: number): T;
+  fromJSON(object: any): T;
+  toJSON(message: T): unknown;
+  create<I extends Exact$1<DeepPartial$1<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact$1<DeepPartial$1<T>, I>>(object: I): T;
+}
+//#endregion
+//#region src/apis/api_user.d.ts
+declare class ApiUser extends BaseApi {
+  userUpdateInfo({ openId, nickname, avatar }: {
+    openId: string;
+    nickname?: string;
+    avatar?: string;
+  }): Promise<void>;
+  getUserInfo(query: {
+    uid: number;
+  } | {
+    openId: string;
+  }): Promise<BasicUserInfo | undefined>;
+  followOp({ openId, upId, op }: {
+    openId: string;
+    upId: number;
+    op: AddRemoveOpType;
+  }): Promise<void>;
+  addFollow({ openId, upId }: {
+    openId: string;
+    upId: number;
+  }): Promise<void>;
+  removeFollow({ openId, upId }: {
+    openId: string;
+    upId: number;
+  }): Promise<void>;
+  getHot({ openId, upId }: {
+    openId: string;
+    upId: number;
+  }): Promise<MediaAsset[]>;
+  checkIsFan(props: {
+    openId: string;
+  } & ({
+    upOpenId: string;
+  } | {
+    upUid: number;
+  })): Promise<boolean>;
+  getFollowList({ openId, cursor, count, hotCount }: {
+    openId: string;
+    cursor?: number;
+    count?: number;
+    hotCount?: number;
+  }): Promise<GetFollowListItem[]>;
+  shareCheck({ openId, media, shareMark }: {
+    openId: string;
+    media?: number;
+    shareMark?: string | undefined | null;
+  }): Promise<{
+    shareMark: string;
+    mediaExists: boolean;
+  }>;
+}
+//#endregion
+//#region src/models/client/api/ad.d.ts
+interface Ad {
+  id: number;
+  materialType: string;
+  materialUrl: string;
+  webpageUrl: string;
+}
+declare const Ad: MessageFns<Ad>;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
+type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]>; } : Partial<T>;
+type KeysOfUnion<T> = T extends T ? keyof T : never;
+type Exact<P, I extends P> = P extends Builtin ? P : P & { [K in keyof P]: Exact<P[K], I[K]>; } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never; };
+interface MessageFns<T> {
+  encode(message: T, writer?: BinaryWriter): BinaryWriter;
+  decode(input: BinaryReader | Uint8Array, length?: number): T;
+  fromJSON(object: any): T;
+  toJSON(message: T): unknown;
+  create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+  fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
+//#endregion
+//#region src/apis/api_ad.d.ts
+declare class ApiAd extends BaseApi {
+  getAd({ openId }: {
+    openId: string;
+  }): Promise<Ad | null>;
+  markAdExpose({ openId, adId, historyId }: {
+    openId: string;
+    adId: number;
+    historyId: number;
+  }): Promise<void>;
+  markAdConvert({ openId, adId, historyId }: {
+    openId: string;
+    adId: number;
+    historyId: number;
+  }): Promise<void>;
+}
+//#endregion
 //#region src/index.d.ts
 type Media = MediaAsset;
-declare const Media: MessageFns$3<MediaAsset>;
-declare const Api_base: Class<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt>;
+declare const Media: MessageFns$5<MediaAsset>;
+type Article = Article$1;
+declare const Article: MessageFns$5<Article$1>;
+declare const Api_base: Class<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd>;
 declare class Api extends Api_base {
   constructor(appId: number, base: string, network: Network);
-  static configureLegacyUtf8(): void;
-  static configureCustomUtf8(): void;
   static createFetch(appId: number, base: string): Api;
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api, Media };
+export { Api, Article, Media, type RankName };
 //# sourceMappingURL=index.d.ts.map
