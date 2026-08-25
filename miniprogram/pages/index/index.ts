@@ -1,5 +1,7 @@
 import {IAppOption} from "../../../typings";
 import {computeVars} from "../../utils/util";
+import {ShareTarget} from "../../api";
+import {kDev, kShareImage, kShareTitle} from "../../utils/consts";
 
 const app = getApp<IAppOption>();
 
@@ -50,8 +52,15 @@ Component({
     options: {
         pureDataPattern: /^_/,
     },
-    properties: {},
+    properties: {
+        share: {
+            type: String,
+            optionalTypes: [null],
+            value: null,
+        }
+    },
     data: {
+        _shareChecked: false,
         _pageViewReported: false,
         currentTab: initTab(),
         tabs: initTabConfig(),
@@ -62,6 +71,7 @@ Component({
             this.setData({
                 vars: computeVars(),
             });
+            this.checkShareOnce();
             this.reportPageViewOnce();
             this.reportTabView();
         },
@@ -72,6 +82,63 @@ Component({
         },
     },
     methods: {
+        async checkShareOnce() {
+            if (this.data._shareChecked) {
+                return;
+            }
+            this.data._shareChecked = true;
+            if (this.properties.share == null || this.properties.share == "") {
+                return;
+            }
+            const share = app.api.parseShareParam(this.properties.share);
+            if (share == null) {
+                return;
+            }
+            if (share.media != null) {
+                let mediaExists: boolean;
+                try {
+                    const response = await app.api.shareCheck({
+                        openId: await app.api.authedOpenId(),
+                        media: share.media,
+                        shareMark: share.sourceMark,
+                    });
+                    mediaExists = response.mediaExists;
+                } catch (err) {
+                    if (kDev) {
+                        console.log('share check', err);
+                    }
+                    wx.showToast({
+                        title: '查找分享内容失败',
+                        icon: 'error',
+                        duration: 1000,
+                    });
+                    return;
+                }
+
+                if (!mediaExists) {
+                    wx.showToast({
+                        title: '分享的视频已失效',
+                        icon: 'error',
+                        duration: 1000,
+                    });
+                    return;
+                }
+
+                app.api.navigateTo({
+                    path: '/pages/feed/index',
+                    params: {
+                        top: share.media,
+                    },
+                });
+            } else if (share.user != null) {
+                app.api.navigateTo({
+                    path: '/pages/user/index',
+                    params: {
+                        top: share.user,
+                    },
+                });
+            }
+        },
         reportPageViewOnce() {
             if (this.data._pageViewReported) {
                 return;
@@ -110,5 +177,26 @@ Component({
         onTapTab(event: WechatMiniprogram.BaseEvent) {
             this.changeTab(event.currentTarget.dataset.tab);
         },
+        onShareAppMessage(event: { from: string }) {
+            return this.doShare('message', event.from);
+        },
+        onShareTimeline() {
+            return this.doShare('timeline');
+        },
+        onAddToFavorites() {
+            return this.doShare('favorite');
+        },
+        doShare(target: ShareTarget, from?: string) {
+            return app.api.createShare({
+                item: {
+                    type: 'app',
+                    title: kShareTitle,
+                    image: kShareImage,
+                },
+                path: '/pages/index/index',
+                target,
+                from,
+            });
+        }
     },
 })

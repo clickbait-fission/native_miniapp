@@ -1,4 +1,6 @@
 import {IAppOption} from "../../../typings";
+import {skCheckBehavior} from "../../behaviors/sk_behavior";
+import {shareBehavior} from "../../behaviors/share_behavior";
 
 const app = getApp<IAppOption>();
 const page = '/user';
@@ -7,6 +9,10 @@ Component({
     options: {
         pureDataPattern: /^_/,
     },
+    behaviors: [
+        skCheckBehavior,
+        shareBehavior,
+    ],
     properties: {
         uid: Number,
         sk: {
@@ -16,7 +22,7 @@ Component({
         },
     },
     data: {
-        _skChecked: false,
+        _shareCheck: false,
     },
     pageLifetimes: {
         show() {
@@ -24,10 +30,21 @@ Component({
                 this.data._skChecked = true;
                 app.api.checkSessionKey({sk: this.properties.sk, page});
             }
+            this.shareCheck();
             app.api.onPageChange({
                 path: page,
             });
         },
     },
-    methods: {}
+    methods: {
+        shareCheck() {
+            if (this.data._shareCheck) {
+                return;
+            }
+
+            this.data._shareCheck = true;
+            const share = this.parseShare();
+            this.skCheckOnce(page, share?.user === this.properties.uid);
+        }
+    }
 })

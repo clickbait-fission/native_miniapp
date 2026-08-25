@@ -1385,6 +1385,148 @@ function assertFloat32(arg) {
 	if (Number.isFinite(arg) && (arg > 34028234663852886e22 || arg < -34028234663852886e22)) throw new Error("invalid float32: " + arg);
 }
 //#endregion
+//#region node_modules/@bufbuild/protobuf/dist/esm/wire/base64-encoding.js
+const nativeSetFromBase64 = Uint8Array.prototype.setFromBase64;
+/**
+* Decodes a base64 string to a byte array.
+*
+* - ignores white-space, including line breaks and tabs
+* - allows inner padding (can decode concatenated base64 strings)
+* - does not require padding
+* - understands base64url encoding:
+*   "-" instead of "+",
+*   "_" instead of "/",
+*   no padding
+*/
+function base64Decode(base64Str) {
+	const len = base64Str.length;
+	let size = len - (len + 3 >> 2);
+	if ((len & 3) == 0 && base64Str[len - 1] == "=") size -= base64Str[len - 2] == "=" ? 2 : 1;
+	const bytes = new Uint8Array(size);
+	let written = -1;
+	if (nativeSetFromBase64) try {
+		const result = nativeSetFromBase64.call(bytes, base64Str);
+		if (result.read == len) written = result.written;
+	} catch (_a) {}
+	if (written < 0) written = setFromBase64(bytes, base64Str);
+	return written == size ? bytes : bytes.subarray(0, written);
+}
+/** Writes into `bytes` from index 0 and returns the number of bytes written. */
+function setFromBase64(bytes, base64Str) {
+	const table = getDecodeTable();
+	let bytePos = 0, groupPos = 0, b, p = 0;
+	for (let i = 0; i < base64Str.length; i++) {
+		b = table[base64Str.charCodeAt(i)];
+		if (b === void 0) switch (base64Str[i]) {
+			case "=": groupPos = 0;
+			case "\n":
+			case "\r":
+			case "	":
+			case " ": continue;
+			default: throw Error("invalid base64 string");
+		}
+		switch (groupPos) {
+			case 0:
+				p = b;
+				groupPos = 1;
+				break;
+			case 1:
+				bytes[bytePos++] = p << 2 | (b & 48) >> 4;
+				p = b;
+				groupPos = 2;
+				break;
+			case 2:
+				bytes[bytePos++] = (p & 15) << 4 | (b & 60) >> 2;
+				p = b;
+				groupPos = 3;
+				break;
+			case 3:
+				bytes[bytePos++] = (p & 3) << 6 | b;
+				groupPos = 0;
+		}
+	}
+	if (groupPos == 1) throw Error("invalid base64 string");
+	return bytePos;
+}
+const nativeToBase64 = Uint8Array.prototype.toBase64;
+const toBase64OptionsMap = {
+	std: {
+		alphabet: "base64",
+		omitPadding: false
+	},
+	std_raw: {
+		alphabet: "base64",
+		omitPadding: true
+	},
+	url: {
+		alphabet: "base64url",
+		omitPadding: true
+	}
+};
+/**
+* Encode a byte array to a base64 string.
+*
+* By default, this function uses the standard base64 encoding with padding.
+*
+* To encode without padding, use encoding = "std_raw".
+*
+* To encode with the URL encoding, use encoding = "url", which replaces the
+* characters +/ by their URL-safe counterparts -_, and omits padding.
+*/
+function base64Encode(bytes, encoding = "std") {
+	if (nativeToBase64) return nativeToBase64.call(bytes, toBase64OptionsMap[encoding]);
+	const table = getEncodeTable(encoding);
+	const pad = encoding == "std";
+	let base64 = "", groupPos = 0, b, p = 0;
+	for (let i = 0; i < bytes.length; i++) {
+		b = bytes[i];
+		switch (groupPos) {
+			case 0:
+				base64 += table[b >> 2];
+				p = (b & 3) << 4;
+				groupPos = 1;
+				break;
+			case 1:
+				base64 += table[p | b >> 4];
+				p = (b & 15) << 2;
+				groupPos = 2;
+				break;
+			case 2:
+				base64 += table[p | b >> 6];
+				base64 += table[b & 63];
+				groupPos = 0;
+		}
+	}
+	if (groupPos) {
+		base64 += table[p];
+		if (pad) {
+			base64 += "=";
+			if (groupPos == 1) base64 += "=";
+		}
+	}
+	return base64;
+}
+let encodeTableStd;
+let encodeTableUrl;
+let decodeTable;
+function getEncodeTable(encoding) {
+	if (!encodeTableStd) {
+		encodeTableStd = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".split("");
+		encodeTableUrl = encodeTableStd.slice(0, -2).concat("-", "_");
+	}
+	return encoding == "url" ? encodeTableUrl : encodeTableStd;
+}
+function getDecodeTable() {
+	if (!decodeTable) {
+		decodeTable = [];
+		const encodeTable = getEncodeTable("std");
+		for (let i = 0; i < encodeTable.length; i++) decodeTable[encodeTable[i].charCodeAt(0)] = i;
+		decodeTable["-".charCodeAt(0)] = encodeTable.indexOf("+");
+		decodeTable["_".charCodeAt(0)] = encodeTable.indexOf("/");
+	}
+	return decodeTable;
+}
+//#endregion
 //#region src/networks/network.ts
 var import_cjs = require_cjs();
 function composeUri({ base, path = "/", params = {} }) {
@@ -1995,7 +2137,7 @@ function createBaseArticle() {
 		brief: ""
 	};
 }
-const Article$1 = {
+const Article = {
 	encode(message, writer = new BinaryWriter()) {
 		if (message.address !== "") writer.uint32(10).string(message.address);
 		if (message.image !== "") writer.uint32(18).string(message.image);
@@ -2056,7 +2198,7 @@ const Article$1 = {
 		return obj;
 	},
 	create(base) {
-		return Article$1.fromPartial(base ?? {});
+		return Article.fromPartial(base ?? {});
 	},
 	fromPartial(object) {
 		const message = createBaseArticle();
@@ -2140,6 +2282,9 @@ var BaseSessionManagement = class {
 	}
 	getSessionKey() {
 		return this.session;
+	}
+	getOpenApp() {
+		return this.openApp;
 	}
 	async navigateTo({ path, params = {} }) {
 		const uri = composeUri({
@@ -5754,7 +5899,7 @@ function createBaseGetArticleResponse() {
 const GetArticleResponse = {
 	encode(message, writer = new BinaryWriter()) {
 		if (message.common !== void 0) CommonResponseData.encode(message.common, writer.uint32(10).fork()).join();
-		for (const v of message.article) Article$1.encode(v, writer.uint32(18).fork()).join();
+		for (const v of message.article) Article.encode(v, writer.uint32(18).fork()).join();
 		return writer;
 	},
 	decode(input, length) {
@@ -5774,7 +5919,7 @@ const GetArticleResponse = {
 						continue;
 					case 2:
 						if (tag !== 18) break;
-						message.article.push(Article$1.decode(reader, reader.uint32()));
+						message.article.push(Article.decode(reader, reader.uint32()));
 						continue;
 				}
 				if ((tag & 7) === 4 || tag === 0) break;
@@ -5788,13 +5933,13 @@ const GetArticleResponse = {
 	fromJSON(object) {
 		return {
 			common: isSet$1(object.common) ? CommonResponseData.fromJSON(object.common) : void 0,
-			article: globalThis.Array.isArray(object?.article) ? object.article.map((e) => Article$1.fromJSON(e)) : []
+			article: globalThis.Array.isArray(object?.article) ? object.article.map((e) => Article.fromJSON(e)) : []
 		};
 	},
 	toJSON(message) {
 		const obj = {};
 		if (message.common !== void 0) obj.common = CommonResponseData.toJSON(message.common);
-		if (message.article?.length) obj.article = message.article.map((e) => Article$1.toJSON(e));
+		if (message.article?.length) obj.article = message.article.map((e) => Article.toJSON(e));
 		return obj;
 	},
 	create(base) {
@@ -5803,7 +5948,7 @@ const GetArticleResponse = {
 	fromPartial(object) {
 		const message = createBaseGetArticleResponse();
 		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
-		message.article = object.article?.map((e) => Article$1.fromPartial(e)) || [];
+		message.article = object.article?.map((e) => Article.fromPartial(e)) || [];
 		return message;
 	}
 };
@@ -6109,10 +6254,7 @@ var ApiUser = class extends BaseApi {
 			}
 		});
 		this.updateCachedShareMark(updateShareMark);
-		return {
-			shareMark: updateShareMark,
-			mediaExists
-		};
+		return { mediaExists };
 	}
 };
 //#endregion
@@ -6543,10 +6685,104 @@ var ApiAd = class extends BaseApi {
 	}
 };
 //#endregion
+//#region src/apis/ext_share.ts
+var ExtShare = class extends BaseApi {
+	createShare(param) {
+		let query = this.generateShareQuery({
+			...convertShareItem(param.item),
+			shareTarget: param.target
+		});
+		this.reportOneLog((base) => [{
+			base,
+			shareVideo: {
+				shareId: query.shareId,
+				mediaId: query.media,
+				shareTarget: query.shareTarget,
+				miniAppFrom: param?.from
+			}
+		}]);
+		const uriQuery = `share=${encodeURIShareQuery(query)}`;
+		return {
+			title: getShareTitle(param.item),
+			path: `${param.path}?${uriQuery}`,
+			query: uriQuery,
+			imageUrl: getShareImage(param.item)
+		};
+	}
+	parseShareParam(share) {
+		return decodeURIShareQuery(share);
+	}
+	generateShareQuery(props) {
+		const now = /* @__PURE__ */ new Date();
+		return {
+			...props,
+			shareTarget: props.shareTarget,
+			timestamp: now.getTime(),
+			shareId: `${now.getUTCFullYear()}.${now.getUTCMonth()}.${genRandomText()}`,
+			sourceUser: this.readCachedOpenId(),
+			sourceMark: this.readCachedShareMark(),
+			enterOpts: this.getShareEnterOpts()
+		};
+	}
+	getShareEnterOpts() {
+		const { path, ...opts } = this.getOpenApp();
+		return {
+			opts,
+			shareId: decodeURIShareQuery(findShareB64Json(path))?.shareId
+		};
+	}
+};
+function convertShareItem(item) {
+	switch (item.type) {
+		case "media": return { media: item.id };
+		case "user": return { user: item.id };
+		case "app": return {};
+		default: throw new Error(`unknown share type`);
+	}
+}
+function getShareTitle(item) {
+	switch (item.type) {
+		case "media": return item.title;
+		case "user": return item.nickname;
+		case "app": return item.title;
+		default: throw new Error(`unknown share type`);
+	}
+}
+function getShareImage(item) {
+	switch (item.type) {
+		case "media": return item.cover;
+		case "user": return item.avatar;
+		case "app": return item.image;
+		default: throw new Error(`unknown share type`);
+	}
+}
+function encodeURIShareQuery(query) {
+	return base64Encode(utf8Encoding.encodeUtf8(JSON.stringify(query)), "url");
+}
+function decodeURIShareQuery(share) {
+	if (share == null) return;
+	try {
+		const bin = base64Decode(share);
+		const text = utf8Encoding.decodeUtf8(bin);
+		return JSON.parse(text);
+	} catch (err) {
+		console.log("parse share", err);
+		return;
+	}
+}
+function findShareB64Json(path) {
+	if (path == null) return void 0;
+	const pos = path.indexOf("?");
+	if (pos < 0) return void 0;
+	const parts = path.substring(pos).split("&");
+	for (const name in parts) {
+		if (name != "share") continue;
+		return parts[name];
+	}
+}
+//#endregion
 //#region src/index.ts
-const Media = MediaAsset;
-const Article = Article$1;
-var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt, ApiMedia, ApiUser, ApiAd) {
+var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt, ApiMedia, ApiUser, ApiAd, ExtShare) {
 	constructor(appId, base, network) {
 		super(appId, base, network);
 	}
@@ -6558,6 +6794,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api, Article, Media };
+export { Api, Article, MediaAsset as Media, genRandomText };
 
 //# sourceMappingURL=index.js.map

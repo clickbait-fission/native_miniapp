@@ -1,7 +1,9 @@
 import {IAppOption} from "../../../typings";
-import {Media} from "../../api";
-import {kDev} from "../../utils/consts";
+import {Media, ShareItem, ShareTarget} from "../../api";
+import {kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
 import {computeVars, sleep} from "../../utils/util";
+import {skCheckBehavior} from "../../behaviors/sk_behavior";
+import {shareBehavior} from "../../behaviors/share_behavior";
 
 const app = getApp<IAppOption>();
 const page = '/feed';
@@ -71,6 +73,10 @@ class RotateSpan {
     get spanActiveIndex(): number {
         // 当前展示内容在span中的index
         return this.rotateOffset;
+    }
+
+    get spanActiveMedia(): Media | null {
+        return this.span[this.rotateOffset].media;
     }
 
     get spanEnd(): number {
@@ -157,22 +163,22 @@ Component({
     options: {
         pureDataPattern: /^_/,
     },
+    behaviors: [
+        skCheckBehavior,
+        shareBehavior,
+    ],
     properties: {
         top: {
             type: Number,
             optionalTypes: [null],
             value: null
         },
-        sk: {
-            type: String,
-            optionalTypes: [null],
-            value: null,
-        },
     },
     data: {
         _active: false,
-        _skChecked: false,
-        _skReportPromise: null as Promise<void> | null,
+        _shareChecked: false,
+        _shareCheckPromise: null as Promise<void> | null,
+        _shareMedia: undefined as number | undefined,
         direction: 'positive',
         hasMedias: false,
         medias: null as MediaInSpan[] | null,
@@ -196,6 +202,7 @@ Component({
                 medias: this.data._span!.span,
                 vars: computeVars(),
             });
+            this.shareCheck();
             this.checkFetchMore();
         },
         detached() {
@@ -204,13 +211,6 @@ Component({
     },
     pageLifetimes: {
         show() {
-            if (!this.data._skChecked) {
-                this.data._skChecked = true;
-                this.data._skReportPromise = app.api.checkSessionKey({
-                    sk: this.properties.sk,
-                    page,
-                });
-            }
             app.api.onPageChange({
                 path: page,
             });
@@ -222,6 +222,31 @@ Component({
         },
     },
     methods: {
+        shareCheck() {
+            if (this.data._shareChecked) {
+                return;
+            }
+            this.data._shareChecked = true;
+
+            const doShareCheck = async () => {
+                const share = this.parseShare();
+                this.skCheckOnce(page, share?.media != null);
+                await this.data._skCheckPromise;
+                const {mediaExists} = await app.api.shareCheck({
+                    openId: await app.api.authedOpenId(),
+                    shareMark: share?.sourceMark ?? "",
+                    media: share?.media ?? undefined,
+                });
+                if (mediaExists) {
+                    this.data._shareMedia = share?.media;
+                }
+            };
+            this.data._shareCheckPromise = doShareCheck().catch((err) => {
+                if (kDev) {
+                    console.log('share check error', err);
+                }
+            });
+        },
         onSwiperChange(event: WechatMiniprogram.SwiperChange) {
             const span = this.data._span!;
 
@@ -277,6 +302,9 @@ Component({
                 return;
             }
 
+            await this.data._skCheckPromise;
+            await this.data._shareCheckPromise;
+
             this.data._fetching = true;
             while (this.data._active && !this.data._end && this.data._span!.spanEnd >= (this.data._data.length - kSpanHalf)) {
                 let chunk: Media[];
@@ -286,7 +314,7 @@ Component({
                     }
                     chunk = await app.api.recommendByRankScore({
                         openId: await app.api.authedOpenId(),
-                        topId: this.data._data.length == 0 ? (this.properties.top ?? undefined) : undefined,
+                        topId: this.data._data.length == 0 ? (this.data._shareMedia ?? this.properties.top ?? undefined) : undefined,
                     });
                 } catch (err) {
                     if (kDev) {
@@ -326,13 +354,44 @@ Component({
                 this.data._playingId = '';
             }
         },
-        onTapShare(event: WechatMiniprogram.CustomEvent) {
-            const mediaId = event.detail.mediaId as number;
-            const target = event.detail.target as string;
-            console.log('fuck', mediaId, target);
-        },
         onTapBack() {
             wx.navigateBack();
+        },
+        onShareAppMessage(event: { from: string }) {
+            return this.doShare('message', event.from);
+        },
+        onShareTimeline() {
+            return this.doShare('timeline');
+        },
+        onAddToFavorites() {
+            return this.doShare('favorite');
+        },
+        doShare(target: ShareTarget, from?: string) {
+            const span = this.data._span!;
+            const media = span.spanActiveMedia;
+
+            let item: ShareItem;
+            if (media == null) {
+                item = {
+                    type: 'app',
+                    title: kShareTitle,
+                    image: kShareImage,
+                };
+            } else {
+                item = {
+                    type: 'media',
+                    id: media.id,
+                    title: media.title,
+                    cover: media.cover,
+                };
+            }
+
+            return app.api.createShare({
+                item,
+                path: kHome,
+                target,
+                from,
+            });
         }
     },
 })

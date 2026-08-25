@@ -23,18 +23,18 @@
                    bind:play="onVideoPlay"
                    bind:pause="onVideoPause"
                    data-id="{{item.id}}"/>
-            <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit" />
+            <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
             <view class="actions">
                 <view class="favorite">
                     <action-favorite mediaId="{{item.media.id}}" isFavorite="{{item.media.isFavorite}}"/>
                 </view>
                 <view class="gap"/>
                 <view class="share">
-                    <action-share mediaId="{{item.media.id}}" target="group" bind:share="onTapShare"/>
+                    <action-share mediaId="{{item.media.id}}" target="group"/>
                 </view>
                 <view class="share-gap"/>
                 <view class="share">
-                    <action-share mediaId="{{item.media.id}}" target="friend" bind:share="onTapShare"/>
+                    <action-share mediaId="{{item.media.id}}" target="friend"/>
                 </view>
             </view>
         </view>

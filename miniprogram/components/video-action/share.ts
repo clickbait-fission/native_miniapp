@@ -25,9 +25,4 @@ Component({
             });
         },
     },
-    methods: {
-        onTap() {
-            this.triggerEvent('share', {mediaId: this.properties.mediaId, target: this.properties.target});
-        },
-    }
 })

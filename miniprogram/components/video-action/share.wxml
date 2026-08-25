@@ -1,4 +1,4 @@
-<view class="{{className}}" bind:tap="onTap">
+<button class="{{className}}" open-type="share">
     <image class="icon" mode="aspectFit" src="/assets/wechat.png" />
     <text class="text">{{text}}</text>
-</view>
+</button>
