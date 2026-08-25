@@ -11,16 +11,4 @@
         </view>
         <view class="bottom-space"/>
     </view>
-    <!--    <list-builder list="{{medias}}" child-height="200">-->
-    <!--        fuck-->
-    <!--    </list-builder>-->
-    <!--    <list-builder list="{{medias}}"-->
-    <!--                  child-height="{{cardHeight}}"-->
-    <!--                  bind:itembuild="onCardBuild"-->
-    <!--                  bind:itemdipose="onCardDisposed">-->
-    <!--        <view slot:item class="card">-->
-    <!--            Card is '{{item}}' of {{medias}}-->
-    <!--            &lt;!&ndash;            <media-brief media="{{item}}" />&ndash;&gt;-->
-    <!--        </view>-->
-    <!--    </list-builder>-->
 </scroll-view>

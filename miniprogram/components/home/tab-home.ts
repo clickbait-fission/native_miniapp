@@ -38,26 +38,35 @@ Component({
         shownMedias: [] as Media[],
         _offset: 0,
         _height: 0,
+        _currentStart: -1,
+        _currentEnd: -1,
     },
     lifetimes: {
         attached() {
             this.data._height = wx.getWindowInfo().windowHeight;
-            this.updateLayout();
+            this.updateLayout(true);
         },
     },
     pageLifetimes: {
         resize(size) {
             this.data._height = size.size.windowHeight;
-            this.updateLayout();
+            this.updateLayout(true);
         },
     },
     methods: {
-        updateLayout() {
+        updateLayout(force?: boolean) {
             const rootHeight = this.properties.cardHeight * this.data.medias.length;
             const safeTop = this.data._offset - this.data._height;
             const safeBottom = this.data._offset + this.data._height * 2;
             const start = Math.max(Math.floor(safeTop / this.properties.cardHeight), 0);
             const end = Math.min(Math.ceil(safeBottom / this.properties.cardHeight), this.data.medias.length - 1);
+
+            if (force != true && this.data._currentStart == start && this.data._currentEnd == end) {
+                return;
+            }
+            this.data._currentStart = start;
+            this.data._currentEnd = end;
+
             const topSpace = start * this.properties.cardHeight;
             const bottomSpace = rootHeight - (end + 1) * this.properties.cardHeight;
             const shownMedias = this.data.medias.slice(start, end);
@@ -80,6 +89,9 @@ Component({
             });
         },
         onScroll(event: ScrollViewScroll) {
+            if (Math.max(this.data._offset - event.detail.scrollTop) < this.properties.cardHeight) {
+                return;
+            }
             this.data._offset = event.detail.scrollTop;
             this.updateLayout();
         },

@@ -3,7 +3,10 @@ import {IAppOption} from "../typings";
 
 // app.ts
 App<IAppOption>({
-    api: Api.createWx(1, ""),
+    // dev
+    api: Api.createWx(3, "http://127.0.0.1:6001/api"),
+    // prod
+    // api: Api.createWx(2, "http://127.0.0.1:6001/api"),
     onLaunch(opts) {
         Api.configureCustomUtf8();
         this.api.onLaunch({sceneId: opts.scene});
