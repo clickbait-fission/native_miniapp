@@ -8,7 +8,42 @@ type TabConfig = {
     name: string;
     activeIcon: string;
     inactiveIcon: string;
+    className: string;
+    create: boolean;
 };
+
+function initTab(): Tab {
+    return 'home';
+}
+
+function initTabConfig(): TabConfig[] {
+    return [
+        {
+            tab: 'home',
+            name: '首页',
+            activeIcon: '/assets/home-active.svg',
+            inactiveIcon: '/assets/home.svg',
+            className: 'content active',
+            create: true,
+        },
+        {
+            tab: 'article',
+            name: '美文',
+            activeIcon: '/assets/article-active.svg',
+            inactiveIcon: '/assets/article.svg',
+            className: 'content inactive',
+            create: false,
+        },
+        {
+            tab: 'settings',
+            name: '设置',
+            activeIcon: '/assets/settings-active.svg',
+            inactiveIcon: '/assets/settings.svg',
+            className: 'content inactive',
+            create: false,
+        },
+    ];
+}
 
 function computeVars() {
     const menuButton = wx.getMenuButtonBoundingClientRect();
@@ -23,28 +58,8 @@ Component({
     properties: {},
     data: {
         _pageViewReported: false,
-        currentTab: 'home' satisfies Tab,
-        homeTabStyle: '',
-        tabs: [
-            {
-                tab: 'home',
-                name: '首页',
-                activeIcon: '/assets/home-active.svg',
-                inactiveIcon: '/assets/home.svg',
-            },
-            {
-                tab: 'article',
-                name: '美文',
-                activeIcon: '/assets/article-active.svg',
-                inactiveIcon: '/assets/article.svg',
-            },
-            {
-                tab: 'settings',
-                name: '设置',
-                activeIcon: '/assets/settings-active.svg',
-                inactiveIcon: '/assets/settings.svg',
-            },
-        ] satisfies TabConfig[],
+        currentTab: initTab(),
+        tabs: initTabConfig(),
         vars: computeVars(),
     },
     pageLifetimes: {
@@ -78,9 +93,19 @@ Component({
             if (this.data.currentTab == tab) {
                 return;
             }
+
+            const newTabs: TabConfig[] = [];
+            for (let tabConfig of this.data.tabs) {
+                newTabs.push({
+                    ...tabConfig,
+                    className: `content ${tab == tabConfig.tab ? 'active' : 'inactive'}`,
+                    create: tabConfig.create || tab == tabConfig.tab,
+                });
+            }
+
             this.setData({
                 currentTab: tab,
-                homeTabStyle: tab === 'home' ? '' : 'display: none;',
+                tabs: newTabs,
             });
             this.reportTabView();
         },
