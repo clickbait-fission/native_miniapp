@@ -1,24 +1,33 @@
-// pages/license/privacy.ts
+import {IAppOption} from "../../../typings";
+
+const app = getApp<IAppOption>();
+const page = '/license/privacy';
+
 Component({
+    options: {
+        pureDataPattern: /^_/,
+    },
+    properties: {
+        sk: {
+            type: String,
+            optionalTypes: [null],
+            value: null,
+        },
+    },
+    data: {
+        _skChecked: false,
+    },
+    pageLifetimes: {
+        show() {
+            if (!this.data._skChecked) {
+                this.data._skChecked = true;
+                app.api.checkSessionKey({sk: this.properties.sk, page});
+            }
 
-  /**
-   * 组件的属性列表
-   */
-  properties: {
-
-  },
-
-  /**
-   * 组件的初始数据
-   */
-  data: {
-
-  },
-
-  /**
-   * 组件的方法列表
-   */
-  methods: {
-
-  }
+            app.api.onPageChange({
+                path: page,
+                params: {},
+            });
+        },
+    }
 })

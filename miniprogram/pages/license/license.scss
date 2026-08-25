@@ -20,12 +20,27 @@
   margin-bottom: 8px;
 }
 
-a {
+.url {
   color: rgba(50, 100, 150, 0.75);
 }
 
-strong {
+.strong {
   font-weight: 600;
+}
+
+.p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.ul {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.li {
+  line-height: 1.6;
+  margin: 4px 0;
 }
 
 .hint {

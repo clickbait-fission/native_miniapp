@@ -2136,6 +2136,20 @@ var BaseSessionManagement = class {
 			openPage: { params: trimParams }
 		}]);
 	}
+	getSessionKey() {
+		return this.session;
+	}
+	async navigateTo({ path, params = {} }) {
+		const uri = composeUri({
+			base: "",
+			path,
+			params: {
+				...params,
+				sk: this.session
+			}
+		});
+		await wx.navigateTo({ url: uri });
+	}
 	updateCachedOpenId(openId) {
 		this.cacheOpenId.value = openId;
 	}
@@ -3764,6 +3778,15 @@ function isSet$6(value) {
 //#endregion
 //#region src/apis/api_report_session_corrupt.ts
 var ApiReportSessionCorrupt = class extends BaseApi {
+	checkSessionKey({ sk, page }) {
+		if (sk === this.session) return null;
+		return this.reportSessionCorrupt({
+			openId: this.readCachedOpenId(),
+			expect: this.session,
+			actual: sk,
+			page
+		});
+	}
 	async reportSessionCorrupt({ openId, expect, actual, page }) {
 		const { shareMark } = await this.invokeProtoApi({
 			path: "/media-hub/user/report-session-corrupt",

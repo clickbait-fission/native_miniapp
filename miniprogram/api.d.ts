@@ -480,6 +480,11 @@ declare class BaseSessionManagement {
     path: string;
     params?: Record<string, string | undefined>;
   }): void;
+  getSessionKey(): string;
+  navigateTo({ path, params }: {
+    path: string;
+    params?: Record<string, string | number | undefined>;
+  }): Promise<void>;
   protected updateCachedOpenId(openId: string): void;
   readCachedOpenId(): string;
   authedOpenId(): Promise<string>;
@@ -534,6 +539,10 @@ declare class BaseApi extends BaseSessionManagement {
 //#endregion
 //#region src/apis/api_report_session_corrupt.d.ts
 declare class ApiReportSessionCorrupt extends BaseApi {
+  checkSessionKey({ sk, page }: {
+    sk: string;
+    page: string;
+  }): Promise<void> | null;
   reportSessionCorrupt({ openId, expect, actual, page }: {
     openId: string;
     expect: string;

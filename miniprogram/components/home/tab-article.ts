@@ -70,8 +70,11 @@ Component({
         },
         async onTapArticle(event: BaseEvent) {
             const url = `${event.currentTarget.dataset.url}`;
-            await wx.navigateTo({
-                url: `/pages/web/index?url=${encodeURIComponent(url)}`
+            await app.api.navigateTo({
+                path: '/pages/web/index',
+                params: {
+                    url,
+                },
             });
         },
     },

@@ -1,5 +1,8 @@
 import {Media} from "../../api";
 import {kAvatar, kNickName} from "../../utils/consts";
+import {IAppOption} from "../../../typings";
+
+const app = getApp<IAppOption>();
 
 Component({
     properties: {
@@ -21,14 +24,20 @@ Component({
     methods: {
         async onTapVideo() {
             const media = this.properties.media as Media;
-            await wx.navigateTo({
-                url: `/pages/feed/index?top=${media.id}`,
+            await app.api.navigateTo({
+                path: '/pages/feed/index',
+                params: {
+                    top: media.id,
+                },
             });
         },
         async onTapAuthor() {
             const media = this.properties.media as Media;
-            await wx.navigateTo({
-                url: `/pages/user/index?uid=${media.ownerId}`,
+            await app.api.navigateTo({
+                path: '/pages/user/index',
+                params: {
+                    uid: media.ownerId,
+                },
             });
         },
     }

@@ -1,19 +1,41 @@
+import {IAppOption} from "../../../typings";
+
+const app = getApp<IAppOption>();
+const page = '/feed';
+
 Component({
+    options: {
+        pureDataPattern: /^_/,
+    },
     properties: {
         top: {
             type: Number,
             optionalTypes: [null],
             value: null
-        }
+        },
+        sk: {
+            type: String,
+            optionalTypes: [null],
+            value: null,
+        },
     },
-
-    /**
-     * 组件的初始数据
-     */
-    data: {},
-
-    /**
-     * 组件的方法列表
-     */
+    data: {
+        _skChecked: false,
+        _skReportPromise: null as Promise<void> | null,
+    },
+    pageLifetimes: {
+        show() {
+            if (!this.data._skChecked) {
+                this.data._skChecked = true;
+                this.data._skReportPromise = app.api.checkSessionKey({
+                    sk: this.properties.sk,
+                    page,
+                });
+            }
+            app.api.onPageChange({
+                path: page,
+            });
+        },
+    },
     methods: {}
 })
