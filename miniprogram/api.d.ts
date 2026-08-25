@@ -585,7 +585,7 @@ declare class ApiMedia extends BaseApi {
   favoriteOp({ openId, mediaId, op }: {
     openId: string;
     mediaId: number;
-    op: AddRemoveOpType;
+    op: 'add' | 'remove';
   }): Promise<void>;
   getFavorite({ openId, cursor, count }: {
     openId: string;

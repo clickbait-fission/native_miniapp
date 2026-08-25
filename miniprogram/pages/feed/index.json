@@ -1,5 +1,7 @@
 {
   "usingComponents": {
-    "spin-anim": "/components/spin-anim/spin-anim"
+    "spin-anim": "/components/spin-anim/spin-anim",
+    "action-favorite": "/components/video-action/favorite",
+    "action-share": "/components/video-action/share"
   }
 }

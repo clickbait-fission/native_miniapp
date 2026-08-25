@@ -19,6 +19,7 @@ function initData(): Media[] {
 
 class MediaInSpan {
     index: number = 0;
+    id: string = '';
     media: Media | null = null;
     active: boolean = false;
     nearActive: boolean = false;
@@ -29,6 +30,7 @@ function initSpanData() {
     for (let i = 0; i < kSpanSize; i++) {
         const media = new MediaInSpan();
         media.index = i;
+        media.id = `video${i}`;
         data.push(media);
     }
     return data;
@@ -179,8 +181,9 @@ Component({
         _data: initData(),
         _fetching: false,
         _end: false,
-        _keys: [] as (number|undefined)[],
+        _keys: [] as (number | undefined)[],
         vars: '',
+        _playingId: '',
     },
     lifetimes: {
         created() {
@@ -305,5 +308,31 @@ Component({
             this.data._fetching = false;
             this.sync();
         },
+        onTapVideo(event: WechatMiniprogram.BaseEvent) {
+            const id = event.target.dataset.id as string;
+            const ctx = wx.createVideoContext(id);
+            if (this.data._playingId == id) {
+                ctx.pause();
+            } else {
+                ctx.play();
+            }
+        },
+        onVideoPlay(event: WechatMiniprogram.BaseEvent) {
+            this.data._playingId = event.target.dataset.id as string;
+        },
+        onVideoPause(event: WechatMiniprogram.BaseEvent) {
+            const id = event.target.dataset.id as string;
+            if (this.data._playingId == id) {
+                this.data._playingId = '';
+            }
+        },
+        onTapShare(event: WechatMiniprogram.CustomEvent) {
+            const mediaId = event.detail.mediaId as number;
+            const target = event.detail.target as string;
+            console.log('fuck', mediaId, target);
+        },
+        onTapBack() {
+            wx.navigateBack();
+        }
     },
 })

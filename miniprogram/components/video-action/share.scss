@@ -1,0 +1,31 @@
+.container {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+
+  border-radius: 20px;
+
+  &.friend {
+    background: #06B606;
+  }
+
+  &.group {
+    background: #F96500;
+  }
+
+  .icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .text {
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+  }
+}

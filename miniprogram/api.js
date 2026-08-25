@@ -5838,6 +5838,16 @@ var ApiMedia = class extends BaseApi {
 		});
 	}
 	async favoriteOp({ openId, mediaId, op }) {
+		let apiOp;
+		switch (op) {
+			case "add":
+				apiOp = 0;
+				break;
+			case "remove":
+				apiOp = 1;
+				break;
+			default: throw new Error(`Unknown favorite op: $op`);
+		}
 		return this.invokeProtoApi({
 			path: "/media-hub/media/favorite-op",
 			requestMeta: FavoriteOperationRequest,
@@ -5846,7 +5856,7 @@ var ApiMedia = class extends BaseApi {
 				common: this.obtainCommonApiData(),
 				openId,
 				mediaId,
-				op
+				op: apiOp
 			},
 			extractor: {
 				commonOf: (response) => response,
