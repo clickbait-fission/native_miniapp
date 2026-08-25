@@ -1,2 +1,39 @@
-<!--components/home/tab-settings.wxml-->
-<text>components/home/tab-settings.wxml</text>
+<template name="favorite">
+    <tab-favorite />
+</template>
+
+<template name="post">
+    <tab-post />
+</template>
+
+<view wx:if="{{!ready}}" class="container">
+    <spin-anim />
+</view>
+
+<view wx:if="{{ready}}" class="container">
+    <view class="user">
+        <image class="avatar" mode="aspectFill" src="{{avatar}}" />
+        <view class="info">
+            <view class="name">
+                <text class="nickname">{{nickname}}</text>
+                <text class="uid">{{uid}}</text>
+            </view>
+            <view class="statistics">
+                <text>{{statistics}}</text>
+            </view>
+        </view>
+    </view>
+
+    <view class="video-tab">
+        <view wx:for="{{tabs}}" wx:key="id" class="{{item.className}}" data-tab="{{item.id}}" bind:tap="changeTab">
+            <text class="name">{{item.name}}</text>
+            <view class="underline"/>
+        </view>
+    </view>
+
+    <view wx:if="{{active}}" class="video-content">
+        <view wx:for="{{tabs}}" wx:key="id" class="{{item.className}}">
+            <template is="{{item.id}}"/>
+        </view>
+    </view>
+</view>

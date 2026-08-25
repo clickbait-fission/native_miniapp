@@ -811,5 +811,5 @@ declare class Api extends Api_base {
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api, Article, MediaAsset as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareTarget, genRandomText };
+export { Api, Article, MediaAsset as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareTarget, BasicUserInfo as UserInfo, genRandomText };
 //# sourceMappingURL=index.d.ts.map

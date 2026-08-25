@@ -1,0 +1,24 @@
+@import 'subtab';
+
+.card {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: 4px;
+
+  display: flex;
+  flex-direction: row;
+  align-items: start;
+}
+
+.cover {
+  width: 130px;
+  height: 80px;
+  border-radius: 12px;
+  margin-right: 8px;
+}
+
+.title {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 500;
+}

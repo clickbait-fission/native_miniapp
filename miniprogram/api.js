@@ -6701,7 +6701,8 @@ var ExtShare = class extends BaseApi {
 				miniAppFrom: param?.from
 			}
 		}]);
-		const uriQuery = `share=${encodeURIShareQuery(query)}`;
+		let uriQuery = `share=${encodeURIShareQuery(query)}`;
+		if (param.item.type == "user") uriQuery = `${uriQuery}&uid=${param.item.id}`;
 		return {
 			title: getShareTitle(param.item),
 			path: `${param.path}?${uriQuery}`,
@@ -6794,6 +6795,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api, Article, MediaAsset as Media, genRandomText };
+export { Api, Article, MediaAsset as Media, BasicUserInfo as UserInfo, genRandomText };
 
 //# sourceMappingURL=index.js.map

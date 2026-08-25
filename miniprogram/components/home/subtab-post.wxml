@@ -9,7 +9,10 @@
     <view class="root">
         <view class="top-space"/>
         <view wx:for="{{shown}}" wx:key="key" class="card">
-            <media-brief media="{{item}}"/>
+            <view wx:for="{{shown}}" wx:key="key" class="card" data-id="{{item.id}}" bind:tap="onTap">
+                <image class="cover" mode="aspectFill" src="{{item.cover}}" />
+                <text class="title">{{item.title}}</text>
+            </view>
         </view>
         <view class="bottom-space"/>
         <view class="hint">

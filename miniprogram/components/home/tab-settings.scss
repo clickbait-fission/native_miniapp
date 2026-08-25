@@ -1,1 +1,124 @@
-/* components/home/tab-settings.wxss */
+.container {
+  width: 100%;
+  height: 100%;
+
+  box-sizing: content-box;
+  padding: 0 12px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  .user {
+    width: 100%;
+    height: 80px;
+
+    display: flex;
+    flex-direction: row;
+    align-items: start;
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .info {
+      flex: 1;
+
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      text-overflow: ellipsis;
+      text-wrap-mode: nowrap;
+
+      .name {
+        width: 100%;
+        font-size: 20px;
+
+        .nickname {
+          font-weight: 500;
+          margin-right: 8px;
+        }
+
+        .uid {
+          font-size: 14px;
+          font-weight: lighter;
+        }
+      }
+
+      .statistics {
+        font-size: 18px;
+        font-weight: lighter;
+      }
+    }
+  }
+
+  .video-tab {
+    width: 100%;
+    height: 38px;
+
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+
+    .tab {
+      height: 100%;
+      flex: 1;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: end;
+
+      .name {
+        transition: font-size 0.2s ease-in-out, font-weight 0.2s ease-in-out;
+      }
+
+      .underline {
+        width: 100%;
+        height: 1.5px;
+
+        transition: background-color 0.2s ease-in-out;
+      }
+
+      &.active {
+        .name {
+          font-size: 26px;
+          font-weight: 500;
+        }
+
+        .underline {
+          background: rgba(0, 0, 0, 1.0);
+        }
+      }
+
+      &.inactive {
+        .name {
+          font-size: 20px;
+          font-weight: 400;
+        }
+
+        .underline {
+          background: rgba(0, 0, 0, 0);
+        }
+      }
+    }
+  }
+
+  .video-content {
+    flex: 1;
+    width: 100%;
+
+    .tab.active {
+      display: block;
+    }
+
+    .tab.inactive {
+      display: none;
+    }
+  }
+}
+

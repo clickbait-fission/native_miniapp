@@ -7,13 +7,13 @@
 </template>
 
 <template name="settings">
-    <tab-settings/>
+    <tab-settings active="{{active}}"/>
 </template>
 
 <view class="container" style="{{vars}}">
     <view class="content-container">
         <view wx:for="{{tabs}}" wx:key="tab" wx:if="{{item.create}}" class="{{item.className}}">
-            <template is="{{item.tab}}"/>
+            <template is="{{item.tab}}" data="{{active : item.tab === currentTab}}"/>
         </view>
     </view>
     <view class="tab">

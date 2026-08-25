@@ -338,7 +338,7 @@ Component({
             this.sync();
         },
         onTapVideo(event: WechatMiniprogram.BaseEvent) {
-            const id = event.target.dataset.id as string;
+            const id = event.currentTarget.dataset.id as string;
             const ctx = wx.createVideoContext(id);
             if (this.data._playingId == id) {
                 ctx.pause();
@@ -347,7 +347,7 @@ Component({
             }
         },
         onVideoPlay(event: WechatMiniprogram.BaseEvent) {
-            const id = event.target.dataset.id as string;
+            const id = event.currentTarget.dataset.id as string;
             if (this.data._playingId != id) {
                 const previousMedia = this.mediaIdOf(this.data._playingId);
                 if (previousMedia != null && !this.data._finishReported) {
@@ -379,13 +379,13 @@ Component({
             }
         },
         onVideoPause(event: WechatMiniprogram.BaseEvent) {
-            const id = event.target.dataset.mediaId as string;
+            const id = event.currentTarget.dataset.mediaId as string;
             if (this.data._playingId == id) {
                 this.data._playingId = '';
             }
         },
         onVideoFinish(event: WechatMiniprogram.BaseEvent) {
-            const id = event.target.dataset.mediaId as string;
+            const id = event.currentTarget.dataset.mediaId as string;
             if (!this.data._finishReported) {
                 this.data._finishReported = true;
 
