@@ -143,6 +143,12 @@
   grid-template-rows: repeat(auto-fit, 32px);
   font-size: 18px;
 
+  .reason {
+    box-sizing: border-box;
+    padding-top: 4px;
+    height: 32px;
+  }
+
   .other {
     display: flex;
     flex-direction: row;

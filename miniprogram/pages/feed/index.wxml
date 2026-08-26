@@ -67,10 +67,10 @@
         </view>
 
         <view wx:if="{{popContent === 'report'}}" class="popup report">
-            <view wx:for="{{reportReason}}" class="cell" data-reason="{{item}}" bind:tap="onTapReportConfirm">
+            <view wx:for="{{reportReason}}" class="cell reason" data-reason="{{item}}" bind:tap="onTapReportConfirm">
                 {{item}}
             </view>
-            <view class="cell other" bind:tap="onTapReportCustom">
+            <view class="cell reason other" bind:tap="onTapReportCustom">
                 <text class="text">其他原因</text>
                 <image class="icon" mode="aspectFit" src="/assets/chevron-right.svg"/>
             </view>
@@ -83,9 +83,7 @@
                       confirm-type="done"
                       adjust-keyboard-to="bottom"
                       focus="{{true}}"
-                      bind:confirm="onTapReportCustomConfirm"
-            />
-
+                      bind:confirm="onTapReportCustomConfirm"/>
             <button class="submit" form-type="submit">提交</button>
         </form>
     </page-container>
