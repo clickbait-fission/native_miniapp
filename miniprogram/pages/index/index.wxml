@@ -1,5 +1,5 @@
 <template name="home">
-    <tab-home/>
+    <tab-home hasTop="{{hasTop}}" top="{{top}}"/>
 </template>
 
 <template name="article">
@@ -7,14 +7,17 @@
 </template>
 
 <template name="settings">
-    <tab-settings />
+    <tab-settings/>
 </template>
 
 <view class="container" style="{{vars}}">
-    <view class="content-container">
+    <view wx:if="{{ready}}" class="content-container">
         <view wx:for="{{tabs}}" wx:key="tab" wx:if="{{item.create}}" class="{{item.className}}">
-            <template is="{{item.tab}}" />
+            <template is="{{item.tab}}" data="{{ hasTop: hasTop, top: top }}" />
         </view>
+    </view>
+    <view wx:if="{{!ready}}" class="loading-hint">
+        <spin-anim />
     </view>
     <view class="tab">
         <view wx:for="{{tabs}}" wx:key="tab" class="item" bind:tap="onTapTab" data-tab="{{item.tab}}">

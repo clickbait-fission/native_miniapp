@@ -1,5 +1,6 @@
 {
   "usingComponents": {
+    "spin-anim": "/components/spin-anim/spin-anim",
     "tab-home": "/components/home/tab-home",
     "tab-article": "/components/home/tab-article",
     "tab-settings": "/components/home/tab-settings"

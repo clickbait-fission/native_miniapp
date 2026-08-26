@@ -11,11 +11,8 @@ Component({
         dynamicListBehavior,
     ],
     properties: {
-        topId: {
-            type: Number,
-            optionalTypes: [null],
-            value: null,
-        },
+        hasTop: Boolean,
+        top: Number,
         cardHeight: {
             type: Number,
             value: 280,
@@ -29,7 +26,7 @@ Component({
                     const openId = await app.api.authedOpenId();
                     return await app.api.recommendByRankScore({
                         openId: openId,
-                        topId: currentCount == 0 ? (this.properties.topId ?? undefined) : undefined,
+                        topId: currentCount == 0 && this.properties.hasTop ? this.properties.top : undefined,
                     });
                 },
             });

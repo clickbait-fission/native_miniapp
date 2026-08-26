@@ -1,7 +1,8 @@
 import {IAppOption} from "../../../typings";
-import {computeVars} from "../../utils/util";
+import {computeVars, sleep} from "../../utils/util";
 import {ShareTarget} from "../../api";
 import {kDev, kShareImage, kShareTitle} from "../../utils/consts";
+import {shareBehavior} from "../../behaviors/share_behavior";
 
 const app = getApp<IAppOption>();
 
@@ -52,16 +53,15 @@ Component({
     options: {
         pureDataPattern: /^_/,
     },
-    properties: {
-        share: {
-            type: String,
-            optionalTypes: [null],
-            value: null,
-        }
-    },
+    behaviors: [
+        shareBehavior,
+    ],
     data: {
         _shareChecked: false,
         _pageViewReported: false,
+        ready: false,
+        top: 0,
+        hasTop: false,
         currentTab: initTab(),
         tabs: initTabConfig(),
         vars: '',
@@ -82,17 +82,26 @@ Component({
         },
     },
     methods: {
-        async checkShareOnce() {
+        checkShareOnce() {
             if (this.data._shareChecked) {
                 return;
             }
             this.data._shareChecked = true;
-            if (this.properties.share == null || this.properties.share == "") {
-                return;
-            }
-            const share = app.api.parseShareParam(this.properties.share);
+
+            this.doShareCheck()
+                .finally(() => {
+                    this.setData({
+                        ready: true,
+                    });
+                });
+        },
+        async doShareCheck() {
+            const share = this.parseShare();
             if (share == null) {
                 return;
+            }
+            if (kDev) {
+                await sleep(2);
             }
             if (share.media != null) {
                 let mediaExists: boolean;
@@ -123,6 +132,11 @@ Component({
                     });
                     return;
                 }
+
+                this.setData({
+                    hasTop: true,
+                    top: share.media,
+                });
 
                 app.api.navigateTo({
                     path: '/pages/feed/index',

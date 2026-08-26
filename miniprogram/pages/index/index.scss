@@ -29,6 +29,16 @@
   }
 }
 
+.loading-hint {
+  flex: 1;
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 .tab {
   box-sizing: content-box;
   width: 100%;
