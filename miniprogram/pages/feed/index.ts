@@ -13,7 +13,7 @@ const kSpanSize = 5;
 /** 当前视频前后各保留的span槽位数, 即 (kSpanSize - 1) / 2 */
 const kSpanHalf = (kSpanSize - 1) / 2;
 /** span末尾距已加载数据末尾多近时提前拉取下一页 */
-const kPrefetchCount = 3;
+const kPrefetchCount = 10;
 
 function initData(): Media[] {
     return [];
