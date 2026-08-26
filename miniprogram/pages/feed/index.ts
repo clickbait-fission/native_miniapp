@@ -39,7 +39,7 @@ function initSpanData() {
 }
 
 /**
- * 管理可循环swiper中旋转的数据span。
+ * 管理循环swiper中旋转的数据span。
  *
  * span固定持有kSpanSize个槽位, 只维护以"当前正在看的视频"为中心的一小段数据窗口,
  * 因此超长feed流不必把全部数据渲染进swiper, 也就没有大数据量下的性能问题。
@@ -51,6 +51,12 @@ function initSpanData() {
  *
  * 因为"即将滑入视口的槽位"总是预先填好了下一个视频, 循环swiper在首尾衔接(4->0或0->4)
  * 的动画过程中不会闪现旧内容; 每次move只会有1个位于视口外的槽位需要重新填充。
+ *
+ * 边界处理(不再依赖swiper的direction属性):
+ *   - 中间区域: 使用上面的旋转布局, circle = true, swiper首尾衔接由旋转槽位保证;
+ *   - 顶/底端边界区域: 切换为线性布局(circle = false), 通过reAnchor把span正好对齐到
+ *     数据边界(顶端槽位0 = 数据0, 底端槽位4 = 最后一个数据), 让swiper自身的首/尾item
+ *     直接成为数据边界, 用户自然无法滑出数据范围。
  */
 class RotateSpan {
     readonly span: MediaInSpan[] = initSpanData();
@@ -61,8 +67,15 @@ class RotateSpan {
     /** 当前正在看的视频在整体feed数据中的index */
     private dataOffset: number = 0;
 
+    /** 是否处于数据边界(top/bottom)的线性布局; false为中间区域的旋转布局 */
+    private linear: boolean = false;
+
     /** 槽位index相对当前视频的偏移, 归一化到 [-kSpanHalf, kSpanHalf] */
     private relOf(index: number): number {
+        if (this.linear) {
+            // 线性布局: 槽位直接按窗口顺序摆放, 不做循环归一化
+            return index - this.rotateOffset;
+        }
         let rel = ((index - this.rotateOffset) % kSpanSize + kSpanSize) % kSpanSize;
         if (rel > kSpanHalf) {
             rel -= kSpanSize;
@@ -79,36 +92,48 @@ class RotateSpan {
         return this.span[this.rotateOffset].media;
     }
 
-    get spanStart(): number {
-        // 当前展示内容最后一个media在所有数据中的index
-        return this.dataOffset - kSpanHalf;
-    }
-
     get spanEnd(): number {
         // 当前展示内容最后一个media在所有数据中的index
         return this.dataOffset + kSpanHalf;
     }
 
-    get canMoveNegative(): boolean {
-        return this.span[(this.rotateOffset + 1) % kSpanSize].media != null;
+    /** 当前数据窗口所处的区域: 顶端 / 中间 / 底端 */
+    regionOf(len: number): 'top' | 'middle' | 'bottom' {
+        if (len <= kSpanSize || this.dataOffset <= kSpanHalf) {
+            return 'top';
+        }
+        if (this.dataOffset >= len - 1 - kSpanHalf) {
+            return 'bottom';
+        }
+        return 'middle';
     }
 
-    get canMovePositive(): boolean {
-        return this.dataOffset > 0;
+    /** 只有中间区域需要swiper循环; 顶/底端边界区域关闭circle, 依靠swiper自身边界 */
+    circleOf(len: number): boolean {
+        return len > kSpanSize && this.regionOf(len) === 'middle';
     }
 
-    get direction() {
-        if (this.canMovePositive && this.canMoveNegative) {
-            return 'all';
+    /**
+     * 将span对齐到数据边界:
+     *   - top:    线性窗口从数据头开始, 当前视频位于槽位 dataOffset(槽位0 = 数据0);
+     *   - bottom: 线性窗口以数据尾结束, 当前视频位于槽位 dataOffset - (len - kSpanSize)
+     *             (槽位4 = 最后一个数据);
+     *   - middle: 保持旋转布局与rotateOffset不变。
+     * 返回布局是否发生了变化。
+     */
+    reAnchor(len: number): boolean {
+        const region = this.regionOf(len);
+        let targetR = this.rotateOffset;
+        if (region === 'top') {
+            targetR = this.dataOffset;
+        } else if (region === 'bottom') {
+            targetR = this.dataOffset - (len - kSpanSize);
         }
-        if (this.canMovePositive) {
-            return 'positive';
-        }
-        if (this.canMoveNegative) {
-            return 'negative';
-        }
-        // unreachable
-        return 'none';
+        const linear = region !== 'middle';
+        const changed = this.linear !== linear || this.rotateOffset !== targetR;
+        this.linear = linear;
+        this.rotateOffset = targetR;
+        return changed;
     }
 
     get hasMedias() {
@@ -217,7 +242,6 @@ Component({
         _finishReported: false,
         _swiperInAnim: false,
         _swiperAnimResetTimer: null as number | null,
-        direction: 'positive',
         circle: false,
         hasMedias: false,
         medias: null as MediaInSpan[] | null,
@@ -325,36 +349,40 @@ Component({
             }
 
             const span = this.data._span!;
-            const direction = span.direction;
-            const isEmpty = !this.data._fetching && this.data._end && this.data._data.length == 0;
+            const data = this.data._data;
+            const len = data.length;
+
+            // 数据边界对齐: 顶/底端切换为线性布局并关闭circle, 中间保持旋转布局
+            span.reAnchor(len);
+            span.pickData(data);
+
+            const isEmpty = !this.data._fetching && this.data._end && len == 0;
             const hasMedias = span.hasMedias;
-            const circle = this.data._data.length > span.span.length && span.spanStart > 0;
+            const circle = span.circleOf(len);
+            const current = span.spanActiveIndex;
 
             let hasUpdate = this.data.medias !== span.span
-                || this.data.direction != direction
                 || this.data.hasMedias != hasMedias
                 || this.data.isEmpty != isEmpty
                 || this.data.circle != circle
+                || this.data.current != current
                 || !span.matchKeys(this.data._keys);
             if (!hasUpdate) {
                 return;
             }
 
-            if (hasUpdate) {
-                const patch = {
-                    hasMedias,
-                    isEmpty,
-                    medias: span.medias,
-                    direction,
-                    circle,
-                    _keys: span.keys,
-                    current: span.spanActiveIndex,
-                };
-                if (kDev) {
-                    console.log('feed.patch', patch);
-                }
-                this.setData(patch);
+            const patch = {
+                hasMedias,
+                isEmpty,
+                medias: span.medias,
+                circle,
+                _keys: span.keys,
+                current,
+            };
+            if (kDev) {
+                console.log('feed.patch', patch);
             }
+            this.setData(patch);
         },
         async checkFetchMore() {
             if (!this.data._active || this.data._fetching || this.data._end || this.data._span!.spanEnd < (this.data._data.length - kPrefetchCount)) {
