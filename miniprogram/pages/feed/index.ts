@@ -79,6 +79,11 @@ class RotateSpan {
         return this.span[this.rotateOffset].media;
     }
 
+    get spanStart(): number {
+        // 当前展示内容最后一个media在所有数据中的index
+        return this.dataOffset - kSpanHalf;
+    }
+
     get spanEnd(): number {
         // 当前展示内容最后一个media在所有数据中的index
         return this.dataOffset + kSpanHalf;
@@ -179,18 +184,19 @@ Component({
         _shareChecked: false,
         _shareCheckPromise: null as Promise<void> | null,
         _shareMedia: undefined as number | undefined,
-        direction: 'positive',
-        hasMedias: false,
-        medias: null as MediaInSpan[] | null,
-        isEmpty: false,
         _span: null as RotateSpan | null,
         _data: initData(),
         _fetching: false,
         _end: false,
         _keys: [] as (number | undefined)[],
-        vars: '',
         _playingId: '',
         _finishReported: false,
+        direction: 'positive',
+        circle: false,
+        hasMedias: false,
+        medias: null as MediaInSpan[] | null,
+        isEmpty: false,
+        vars: '',
     },
     lifetimes: {
         created() {
@@ -274,11 +280,13 @@ Component({
             const direction = span.direction;
             const isEmpty = !this.data._fetching && this.data._end && this.data._data.length == 0;
             const hasMedias = span.hasMedias;
+            const circle = this.data._data.length > span.span.length && span.spanStart > 0;
 
             let hasUpdate = this.data.medias !== span.span
                 || this.data.direction != direction
                 || this.data.hasMedias != hasMedias
                 || this.data.isEmpty != isEmpty
+                || this.data.circle != circle
                 || !span.matchKeys(this.data._keys);
             if (!hasUpdate) {
                 return;
@@ -290,6 +298,7 @@ Component({
                     isEmpty,
                     medias: span.span,
                     direction,
+                    circle,
                     _keys: span.keys,
                 };
                 if (kDev) {

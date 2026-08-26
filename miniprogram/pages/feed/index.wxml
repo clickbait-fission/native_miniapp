@@ -4,7 +4,7 @@
 </view>
 
 <swiper wx:if="{{ hasMedias }}" class="container" style="{{vars}}"
-        circular="{{true}}" vertical="{{true}}" indicator-dots="{{false}}"
+        circular="{{ circle }}" vertical="{{true}}" indicator-dots="{{false}}"
         direction="{{direction}}" bind:change="onSwiperChange">
     <swiper-item wx:for="{{medias}}" wx:key="index">
         <view wx:if="{{item.media != null}}" class="card">
@@ -38,6 +38,9 @@
                     <action-share mediaId="{{item.media.id}}" target="friend"/>
                 </view>
             </view>
+        </view>
+        <view wx:if="{{item.media == null}}" class="empty-hint">
+            <spin-anim />
         </view>
     </swiper-item>
 </swiper>
