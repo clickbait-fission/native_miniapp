@@ -215,6 +215,8 @@ Component({
         _keys: [] as (number | undefined)[],
         _playingId: '',
         _finishReported: false,
+        _swiperInAnim: false,
+        _swiperAnimResetTimer: null as number | null,
         direction: 'positive',
         circle: false,
         hasMedias: false,
@@ -279,8 +281,9 @@ Component({
             });
         },
         onSwiperChange(event: WechatMiniprogram.SwiperChange) {
+            this.markSwiperInAnim();
+
             const span = this.data._span!;
-            console.log('fuck', event.detail.source);
 
             let step = event.detail.current - span.spanActiveIndex;
             if (step > kSpanHalf) {
@@ -293,8 +296,27 @@ Component({
             }
             span.move(step);
             span.pickData(this.data._data);
-            this.sync();
+            // this.sync();
             this.checkFetchMore();
+        },
+        onSwiperAnimFinish() {
+            this.markSwiperAnimDone();
+        },
+        markSwiperInAnim() {
+            this.data._swiperInAnim = true;
+            if (this.data._swiperAnimResetTimer != null) {
+                clearTimeout(this.data._swiperAnimResetTimer);
+            }
+            this.data._swiperAnimResetTimer = setTimeout(() => {
+                this.markSwiperAnimDone();
+            }, 1000);
+        },
+        markSwiperAnimDone() {
+            this.data._swiperInAnim = false;
+            if (this.data._swiperAnimResetTimer != null) {
+                clearTimeout(this.data._swiperAnimResetTimer);
+            }
+            this.sync();
         },
         sync() {
             if (kDev) {
@@ -345,7 +367,7 @@ Component({
                 let chunk: Media[];
                 try {
                     if (kDev) {
-                        await sleep(1);
+                        await sleep(2);
                     }
                     chunk = await app.api.recommendByRankScore({
                         openId: await app.api.authedOpenId(),
@@ -365,11 +387,16 @@ Component({
                 }
 
                 this.data._data.push(...chunk);
+                this.data._end = this.data._data.length >= 6; //todo 模拟数据不足
                 this.data._span!.pickData(this.data._data);
-                this.sync();
+                if (!this.data._swiperInAnim) {
+                    this.sync();
+                }
             }
             this.data._fetching = false;
-            this.sync();
+            if (!this.data._swiperInAnim) {
+                this.sync();
+            }
         },
         onTapVideo(event: WechatMiniprogram.BaseEvent) {
             const id = event.currentTarget.dataset.id as string;

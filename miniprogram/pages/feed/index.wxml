@@ -6,7 +6,8 @@
 <view class="container" style="{{vars}}">
     <swiper wx:if="{{ hasMedias }}" class="swiper"
             circular="{{ circle }}" vertical="{{true}}" indicator-dots="{{false}}"
-            direction="{{ direction }}" bind:change="onSwiperChange">
+            direction="{{ direction }}"
+            bind:change="onSwiperChange" bind:animationfinish="onSwiperAnimFinish">
         <swiper-item wx:for="{{medias}}" wx:key="index">
             <view wx:if="{{item.media != null}}" class="card">
                 <image wx:if="{{item.nearActive}}" class="cover" src="{{item.media.cover}}"
