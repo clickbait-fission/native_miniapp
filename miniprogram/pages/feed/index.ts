@@ -1,7 +1,7 @@
 import {IAppOption} from "../../../typings";
 import {Media, ShareItem, ShareTarget} from "../../api";
 import {kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
-import {computeVars, sleep} from "../../utils/util";
+import {computeVars, safeBack, sleep} from "../../utils/util";
 import {skCheckBehavior} from "../../behaviors/sk_behavior";
 import {shareBehavior} from "../../behaviors/share_behavior";
 
@@ -502,7 +502,7 @@ Component({
             return undefined;
         },
         onTapBack() {
-            wx.navigateBack();
+            safeBack();
         },
         onShareAppMessage(event: { from: string }) {
             return this.doShare('message', event.from);

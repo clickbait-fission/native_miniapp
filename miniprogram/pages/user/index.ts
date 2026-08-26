@@ -15,11 +15,6 @@ Component({
     ],
     properties: {
         uid: Number,
-        sk: {
-            type: String,
-            optionalTypes: [null],
-            value: null,
-        },
     },
     data: {
         _shareCheck: false,

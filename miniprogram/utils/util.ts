@@ -10,3 +10,13 @@ export function computeVars() {
     const windowInfo = wx.getWindowInfo();
     return `--safe-top: ${Math.max(menuButton.top, windowInfo.safeArea.top)}px; --safe-bottom: ${windowInfo.windowHeight - windowInfo.safeArea.bottom}px;`;
 }
+
+export function safeBack() {
+    if (getCurrentPages().length == 1) {
+        wx.redirectTo({
+            url: '/pages/index/index',
+        });
+    } else {
+        wx.navigateBack();
+    }
+}
