@@ -365,7 +365,6 @@ Component({
                 }
 
                 this.data._data.push(...chunk);
-                this.data._end = this.data._data.length >= 2; //todo
                 this.data._span!.pickData(this.data._data);
                 this.sync();
             }
