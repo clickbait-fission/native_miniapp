@@ -128,6 +128,30 @@ class RotateSpan {
         return keys;
     }
 
+    get medias(): MediaInSpan[] {
+        // 处理数据不足kSpanSize的情况
+        if (this.dataOffset - this.rotateOffset == 0) {
+            const headPart = [];
+            let status: 'head' | 'gap' = 'head';
+            for (let i = 0; i < this.span.length; i++) {
+                if (this.span[i].media != null) {
+                    if (status == 'head') {
+                        headPart.push(this.span[i]);
+                    } else {
+                        // something is wrong
+                        return this.span;
+                    }
+                } else {
+                    if (status == 'head') {
+                        status = 'gap';
+                    }
+                }
+            }
+            return headPart;
+        }
+        return this.span;
+    }
+
     matchKeys(keys: (number | undefined)[]) {
         if (keys.length != kSpanSize) {
             return false;
@@ -206,7 +230,7 @@ Component({
         attached() {
             this.data._active = true;
             this.setData({
-                medias: this.data._span!.span,
+                medias: this.data._span!.medias,
                 vars: computeVars(),
             });
             this.shareCheck();
@@ -256,6 +280,7 @@ Component({
         },
         onSwiperChange(event: WechatMiniprogram.SwiperChange) {
             const span = this.data._span!;
+            console.log('fuck', event.detail.source);
 
             let step = event.detail.current - span.spanActiveIndex;
             if (step > kSpanHalf) {
@@ -296,7 +321,7 @@ Component({
                 const patch = {
                     hasMedias,
                     isEmpty,
-                    medias: span.span,
+                    medias: span.medias,
                     direction,
                     circle,
                     _keys: span.keys,
@@ -340,6 +365,7 @@ Component({
                 }
 
                 this.data._data.push(...chunk);
+                this.data._end = this.data._data.length >= 2; //todo
                 this.data._span!.pickData(this.data._data);
                 this.sync();
             }

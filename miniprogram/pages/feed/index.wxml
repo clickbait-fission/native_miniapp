@@ -3,44 +3,46 @@
     <text wx:if="{{isEmpty}}">当前无视频内容</text>
 </view>
 
-<swiper wx:if="{{ hasMedias }}" class="container" style="{{vars}}"
-        circular="{{ circle }}" vertical="{{true}}" indicator-dots="{{false}}"
-        direction="{{direction}}" bind:change="onSwiperChange">
-    <swiper-item wx:for="{{medias}}" wx:key="index">
-        <view wx:if="{{item.media != null}}" class="card">
-            <image wx:if="{{item.nearActive}}" class="cover" src="{{item.media.cover}}"
-                   mode="aspectFill"/>
-            <video wx:if="{{item.active}}"
-                   id="{{item.id}}"
-                   class="video"
-                   src="{{item.media.url}}"
-                   autoplay="{{true}}"
-                   loop="{{true}}"
-                   show-progress="{{true}}"
-                   show-fullscreen-btn="{{true}}"
-                   bind:tap="onTapVideo"
-                   bind:play="onVideoPlay"
-                   bind:pause="onVideoPause"
-                   bind:ended="onVideoFinish"
-                   data-id="{{item.id}}"
-                   data-media-id="{{item.media.id}}"/>
-            <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
-            <view class="actions">
-                <view class="favorite">
-                    <action-favorite mediaId="{{item.media.id}}" isFavorite="{{item.media.isFavorite}}"/>
-                </view>
-                <view class="gap"/>
-                <view class="share">
-                    <action-share mediaId="{{item.media.id}}" target="group"/>
-                </view>
-                <view class="share-gap"/>
-                <view class="share">
-                    <action-share mediaId="{{item.media.id}}" target="friend"/>
+<view class="container" style="{{vars}}">
+    <swiper wx:if="{{ hasMedias }}" class="swiper"
+            circular="{{ circle }}" vertical="{{true}}" indicator-dots="{{false}}"
+            direction="{{ direction }}" bind:change="onSwiperChange">
+        <swiper-item wx:for="{{medias}}" wx:key="index">
+            <view wx:if="{{item.media != null}}" class="card">
+                <image wx:if="{{item.nearActive}}" class="cover" src="{{item.media.cover}}"
+                       mode="aspectFill"/>
+                <video wx:if="{{item.active}}"
+                       id="{{item.id}}"
+                       class="video"
+                       src="{{item.media.url}}"
+                       autoplay="{{true}}"
+                       loop="{{true}}"
+                       show-progress="{{true}}"
+                       show-fullscreen-btn="{{true}}"
+                       bind:tap="onTapVideo"
+                       bind:play="onVideoPlay"
+                       bind:pause="onVideoPause"
+                       bind:ended="onVideoFinish"
+                       data-id="{{item.id}}"
+                       data-media-id="{{item.media.id}}"/>
+                <view class="actions">
+                    <view class="favorite">
+                        <action-favorite mediaId="{{item.media.id}}" isFavorite="{{item.media.isFavorite}}"/>
+                    </view>
+                    <view class="gap"/>
+                    <view class="share">
+                        <action-share mediaId="{{item.media.id}}" target="group"/>
+                    </view>
+                    <view class="share-gap"/>
+                    <view class="share">
+                        <action-share mediaId="{{item.media.id}}" target="friend"/>
+                    </view>
                 </view>
             </view>
-        </view>
-        <view wx:if="{{item.media == null}}" class="empty-hint">
-            <spin-anim />
-        </view>
-    </swiper-item>
-</swiper>
+            <view wx:if="{{item.media == null}}" class="empty-hint">
+                <spin-anim/>
+            </view>
+        </swiper-item>
+    </swiper>
+    <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
+</view>
