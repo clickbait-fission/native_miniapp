@@ -223,6 +223,7 @@ Component({
         medias: null as MediaInSpan[] | null,
         isEmpty: false,
         vars: '',
+        current: 0,
     },
     lifetimes: {
         created() {
@@ -347,6 +348,7 @@ Component({
                     direction,
                     circle,
                     _keys: span.keys,
+                    current: span.spanActiveIndex,
                 };
                 if (kDev) {
                     console.log('feed.patch', patch);
