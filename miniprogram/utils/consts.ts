@@ -1,4 +1,4 @@
-export const kDev = false;
+// 文件包含环境切换,除非**有必要**,否则不要提交本文件
 
 // export const kAppId = 3;
 // export const kApiBase = "http://192.168.199.205:6001/api";
