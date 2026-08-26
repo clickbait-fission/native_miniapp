@@ -31,7 +31,7 @@
         </view>
     </view>
 
-    <view wx:if="{{active}}" class="video-content">
+    <view class="video-content">
         <view wx:for="{{tabs}}" wx:key="id" class="{{item.className}}">
             <template is="{{item.id}}"/>
         </view>

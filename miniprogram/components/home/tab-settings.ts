@@ -9,9 +9,6 @@ Component({
     options: {
         pureDataPattern: /^_/,
     },
-    properties: {
-        active: Boolean,
-    },
     data: {
         _active: false,
         ready: false,
