@@ -8,7 +8,7 @@ export async function sleep(seconds?: number) {
 export function computeVars() {
     const menuButton = wx.getMenuButtonBoundingClientRect();
     const windowInfo = wx.getWindowInfo();
-    return `--safe-top: ${Math.max(menuButton.top, windowInfo.safeArea.top)}px; --safe-bottom: ${windowInfo.windowHeight - windowInfo.safeArea.bottom}px;`;
+    return `--safe-top: ${Math.max(menuButton.top, windowInfo.safeArea.top)}px; --safe-bottom: ${windowInfo.windowHeight - windowInfo.safeArea.bottom}px; --menu-button-height: ${menuButton.height}px;`;
 }
 
 export function safeBack() {

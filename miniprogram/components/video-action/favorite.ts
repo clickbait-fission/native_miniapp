@@ -18,7 +18,7 @@ Component({
     },
     lifetimes: {
         attached() {
-            this.data._favoriteUntrack = app.favorite.addObserver(() => {
+            this.data._favoriteUntrack = app.favorite.observe(() => {
                 this.updateFavorite();
             });
             this.updateFavorite();
@@ -29,7 +29,7 @@ Component({
     },
     methods: {
         updateFavorite() {
-            const isFavorite = app.favorite.isFavorite(this.properties.mediaId, this.properties.isFavorite);
+            const isFavorite = app.favorite.check(this.properties.mediaId, this.properties.isFavorite);
             this.setData({
                 icon: isFavorite ? '/assets/favorite-remove.svg' : '/assets/favorite-add.svg',
             });
@@ -39,11 +39,11 @@ Component({
                 return;
             }
 
-            const isFavorite = app.favorite.isFavorite(this.properties.mediaId, this.properties.isFavorite);
+            const isFavorite = app.favorite.check(this.properties.mediaId, this.properties.isFavorite);
             const op = isFavorite ? 'remove' : 'add';
             const opName = isFavorite ? '取消收藏' : '收藏';
             const revertOp = isFavorite ? 'add' : 'remove';
-            app.favorite.changeFavorite(this.properties.mediaId, op);
+            app.favorite.change(this.properties.mediaId, op);
             try {
                 await app.api.favoriteOp({
                     openId: await app.api.authedOpenId(),
@@ -56,7 +56,7 @@ Component({
                     title: `${opName}失败`,
                     duration: 1000,
                 });
-                app.favorite.changeFavorite(this.properties.mediaId, revertOp);
+                app.favorite.change(this.properties.mediaId, revertOp);
                 return;
             } finally {
                 this.data._busy = false;

@@ -142,7 +142,7 @@ export const dynamicListBehavior = Behavior({
                 .catch((err) => {
                     dynamicList.fetching = false;
                     if (kDev) {
-                        console.log('rank error', err);
+                        console.error('rank error', err);
                     }
                     setTimeout(() => {
                         this.updateFetch();

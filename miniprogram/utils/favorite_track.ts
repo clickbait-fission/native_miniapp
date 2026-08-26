@@ -1,33 +1,33 @@
 import {kDev} from "./consts";
 
-type FavoriteOp = 'add' | 'remove';
+type OverrideOp = 'add' | 'remove';
 
-export class FavoriteTrack {
-    private readonly favorites: Record<number, FavoriteOp> = {};
+export class BasicTrack {
+    private readonly overrides: Record<number, OverrideOp> = {};
     private readonly observing: Record<number, () => void> = {};
     private nextObservingId = 1;
     private hasUpdate = false;
 
-    addFavorite(id: number) {
-        this.changeFavorite(id, 'add');
+    add(id: number) {
+        this.change(id, 'add');
     }
 
-    removeFavorite(id: number) {
-        this.changeFavorite(id, 'remove');
+    remove(id: number) {
+        this.change(id, 'remove');
     }
 
-    changeFavorite(id: number, op: FavoriteOp) {
-        if (id in this.favorites && this.favorites[id] === op) {
+    change(id: number, op: OverrideOp) {
+        if (id in this.overrides && this.overrides[id] === op) {
             return;
         }
-        this.favorites[id] = op;
+        this.overrides[id] = op;
         this.hasUpdate = true;
         setTimeout(() => {
             this.triggerUpdate();
         });
     }
 
-    addObserver(cb: () => void) {
+    observe(cb: () => void) {
         const idx = this.nextObservingId++;
         this.observing[idx] = cb;
 
@@ -38,16 +38,24 @@ export class FavoriteTrack {
         };
     }
 
-    isFavorite(id: number, inputFavorite?: boolean) {
-        if (id in this.favorites) {
-            switch (this.favorites[id]) {
+    has(id: number) {
+        return id in this.overrides;
+    }
+
+    optCheck(id: number): boolean | undefined {
+        if (id in this.overrides) {
+            switch (this.overrides[id]) {
                 case 'add':
                     return true;
                 case 'remove':
                     return false;
             }
         }
-        return inputFavorite ?? false;
+        return undefined;
+    }
+
+    check(id: number, fallback?: boolean) {
+        return this.optCheck(id) ?? fallback ?? false;
     }
 
     private triggerUpdate() {
@@ -61,7 +69,7 @@ export class FavoriteTrack {
                 this.observing[idx]();
             } catch (err) {
                 if (kDev) {
-                    console.log('FavoriteTrack.update error', err);
+                    console.error('FavoriteTrack.update error', err);
                 }
             }
         }

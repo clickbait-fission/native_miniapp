@@ -114,7 +114,7 @@ Component({
                     mediaExists = response.mediaExists;
                 } catch (err) {
                     if (kDev) {
-                        console.log('share check', err);
+                        console.error('share check', err);
                     }
                     wx.showToast({
                         title: '查找分享内容失败',
@@ -148,7 +148,7 @@ Component({
                 app.api.navigateTo({
                     path: '/pages/user/index',
                     params: {
-                        top: share.user,
+                        uid: share.user,
                     },
                 });
             }

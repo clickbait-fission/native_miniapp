@@ -48,7 +48,7 @@ Component({
                     });
                 } catch (err) {
                     if (kDev) {
-                        console.log('get user info', err);
+                        console.error('get user info', err);
                     }
                     await sleep(1);
                     continue;

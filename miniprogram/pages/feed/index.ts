@@ -301,7 +301,7 @@ Component({
             };
             this.data._shareCheckPromise = doShareCheck().catch((err) => {
                 if (kDev) {
-                    console.log('share check error', err);
+                    console.error('share check error', err);
                 }
             });
         },
@@ -405,7 +405,7 @@ Component({
                     });
                 } catch (err) {
                     if (kDev) {
-                        console.log('feed error', err);
+                        console.error('feed error', err);
                     }
                     await sleep(1);
                     continue;

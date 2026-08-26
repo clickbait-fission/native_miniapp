@@ -296,11 +296,6 @@ declare enum ResponseStatus {
   BadRequest = 2,
   UNRECOGNIZED = -1
 }
-declare enum AddRemoveOpType {
-  Add = 0,
-  Remove = 1,
-  UNRECOGNIZED = -1
-}
 interface CommonApiData {
   /** 服务端配置的id 不是微信appId */
   appId: number;
@@ -461,6 +456,7 @@ interface MessageFns$2<T> {
 declare class BaseSessionManagement {
   protected session: string;
   private readonly cacheOpenId;
+  private readonly cacheUid;
   private readonly cacheShareMark;
   readonly appId: number;
   protected cachedPath: string;
@@ -487,6 +483,9 @@ declare class BaseSessionManagement {
     path: string;
     params?: Record<string, string | number | undefined>;
   }): Promise<void>;
+  protected updateCachedUid(uid: number): void;
+  readCacheUid(): number | undefined;
+  authedUid(): Promise<number | undefined>;
   protected updateCachedOpenId(openId: string): void;
   readCachedOpenId(): string;
   authedOpenId(): Promise<string>;
@@ -573,6 +572,9 @@ declare class ApiAuth extends BaseApi {
   }): Promise<void>;
 }
 //#endregion
+//#region src/compatible/add_remove_op.d.ts
+type TextAddRemoveOp = 'add' | 'remove';
+//#endregion
 //#region src/apis/api_media.d.ts
 type RankName = 'hot';
 declare class ApiMedia extends BaseApi {
@@ -586,7 +588,7 @@ declare class ApiMedia extends BaseApi {
   favoriteOp({ openId, mediaId, op }: {
     openId: string;
     mediaId: number;
-    op: 'add' | 'remove';
+    op: TextAddRemoveOp;
   }): Promise<void>;
   getFavorite({ openId, cursor, count }: {
     openId: string;
@@ -670,7 +672,7 @@ declare class ApiUser extends BaseApi {
   followOp({ openId, upId, op }: {
     openId: string;
     upId: number;
-    op: AddRemoveOpType;
+    op: TextAddRemoveOp;
   }): Promise<void>;
   addFollow({ openId, upId }: {
     openId: string;

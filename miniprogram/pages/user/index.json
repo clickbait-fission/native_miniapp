@@ -1,3 +1,5 @@
 {
-  "usingComponents": {}
+  "usingComponents": {
+    "spin-anim": "/components/spin-anim/spin-anim"
+  }
 }

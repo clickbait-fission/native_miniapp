@@ -34,7 +34,7 @@ export const skCheckBehavior = Behavior({
                 page,
             })?.catch((err) => {
                 if (kDev) {
-                    console.log('sk check error', page, err);
+                    console.error('sk check error', page, err);
                 }
             });
         },

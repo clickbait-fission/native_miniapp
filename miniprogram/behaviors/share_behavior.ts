@@ -20,7 +20,7 @@ export const shareBehavior = Behavior({
                 return app.api.parseShareParam(this.properties.share);
             } catch (err) {
                 if (kDev) {
-                    console.log('parse share', err);
+                    console.error('parse share', err);
                 }
                 return undefined;
             }

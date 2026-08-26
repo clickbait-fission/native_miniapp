@@ -48,7 +48,7 @@ Component({
                     });
                 } catch (err) {
                     if (kDev) {
-                        console.log('article error', err);
+                        console.error('article error', err);
                     }
                     await sleep(1);
                     continue;

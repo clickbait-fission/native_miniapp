@@ -23,7 +23,7 @@ Component({
             this.data._dynamicList.allowLoadMore = true;
             this.updateLayout();
             this.updateFetch();
-            this.data._favoriteTrack = app.favorite.addObserver(() => {
+            this.data._favoriteTrack = app.favorite.observe(() => {
                 this.reInitDynamicList();
                 this.updateLayout();
                 this.updateFetch();
