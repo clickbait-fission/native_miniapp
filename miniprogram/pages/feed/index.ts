@@ -648,8 +648,16 @@ Component({
             this.doReport(event.detail.value.reason);
         },
         doReport(reason: string) {
-            reason = reason.trim();
+            async function doReport(mediaId: number, reason: string) {
+                const openId = await app.api.authedOpenId();
+                await app.api.reportVideo({
+                    openId,
+                    mediaId,
+                    reason,
+                });
+            }
 
+            reason = reason.trim();
             if (reason == '') {
                 wx.showToast({
                     title: '请填写举报原因',
@@ -658,12 +666,24 @@ Component({
                 return;
             }
 
-            console.log(reason);
+            const mediaId = this.data._span?.spanActiveMedia?.id;
+            if (mediaId != null) {
+                doReport(mediaId, reason).then(() => {
+                    wx.showToast({
+                        title: '已提交举报',
+                        icon: 'success',
+                    });
+                }).catch((err) => {
+                    if (kDev) {
+                        console.error('report video', err);
+                    }
+                    wx.showToast({
+                        title: '已提交失败,请稍后重试',
+                        icon: 'success',
+                    });
+                });
+            }
 
-            wx.showToast({
-                title: '已提交举报',
-                icon: 'success',
-            });
             this.setData({
                 popContent: '',
             });

@@ -3350,9 +3350,9 @@ var BaseApi = class extends BaseSessionManagement {
 			headers: { "Content-Type": "application/protobuf" },
 			requestBody: options.requestMeta.encode(options.requestBody, new BinaryWriter((text) => utf8Encoding.encodeUtf8(text))).finish()
 		});
-		response.headers["access-id"];
+		const accessId = response.headers["access-id"] ?? "unknown access id";
 		const body = options.responseMeta.decode(new BinaryReader(response.body, (bytes) => utf8Encoding.decodeUtf8(bytes)));
-		checkApiResponse(options.extractor.commonOf(body));
+		checkApiResponse(accessId, options.extractor.commonOf(body));
 		return options.extractor.bodyOf(body);
 	}
 	invokeNoOutputProtoApi(options) {
@@ -3366,28 +3366,34 @@ var BaseApi = class extends BaseSessionManagement {
 		});
 	}
 };
-var BadResponseException = class extends Error {
+var ApiException = class extends Error {
+	constructor(accessId, status) {
+		super();
+		this.accessId = accessId;
+		this.status = status;
+	}
+};
+var BadResponseException = class extends ApiException {
 	get name() {
 		return "BaseResponse";
 	}
-	constructor(message) {
-		super();
+	constructor(accessId, message) {
+		super(accessId);
 		this.message = message;
 	}
 };
-var ApiException = class extends Error {
+var ServerException = class extends ApiException {
 	get name() {
 		return "ApiException";
 	}
-	constructor(status, message) {
-		super();
-		this.status = status;
+	constructor(accessId, status, message) {
+		super(accessId, status);
 		this.message = message;
 	}
 };
-function checkApiResponse(common) {
-	if (common == null) throw new BadResponseException("no common data");
-	if (common.status != 0) throw new ApiException(common.status, common.message);
+function checkApiResponse(accessId, common) {
+	if (common == null) throw new BadResponseException(accessId, "no common data");
+	if (common.status != 0) throw new ServerException(accessId, common.status, common.message);
 }
 //#endregion
 //#region src/models/client/api/user.ts
@@ -4738,6 +4744,86 @@ const ReportSessionCorruptResponse = {
 		const message = createBaseReportSessionCorruptResponse();
 		message.common = object.common !== void 0 && object.common !== null ? CommonResponseData.fromPartial(object.common) : void 0;
 		message.shareMark = object.shareMark ?? "";
+		return message;
+	}
+};
+function createBaseReportVideoRequest() {
+	return {
+		common: void 0,
+		openId: "",
+		mediaId: 0,
+		reason: ""
+	};
+}
+const ReportVideoRequest = {
+	encode(message, writer = new BinaryWriter()) {
+		if (message.common !== void 0) CommonApiData.encode(message.common, writer.uint32(10).fork()).join();
+		if (message.openId !== "") writer.uint32(18).string(message.openId);
+		if (message.mediaId !== 0) writer.uint32(24).int64(message.mediaId);
+		if (message.reason !== "") writer.uint32(34).string(message.reason);
+		return writer;
+	},
+	decode(input, length) {
+		const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+		const previousRecursionDepth = reader.__tsProtoDecodeDepth ?? 0;
+		if (previousRecursionDepth >= 100) throw new globalThis.Error("protobuf decode recursion limit exceeded");
+		reader.__tsProtoDecodeDepth = previousRecursionDepth + 1;
+		try {
+			const end = length === void 0 ? reader.len : reader.pos + length;
+			const message = createBaseReportVideoRequest();
+			while (reader.pos < end) {
+				const tag = reader.uint32();
+				switch (tag >>> 3) {
+					case 1:
+						if (tag !== 10) break;
+						message.common = CommonApiData.decode(reader, reader.uint32());
+						continue;
+					case 2:
+						if (tag !== 18) break;
+						message.openId = reader.string();
+						continue;
+					case 3:
+						if (tag !== 24) break;
+						message.mediaId = longToNumber$4(reader.int64());
+						continue;
+					case 4:
+						if (tag !== 34) break;
+						message.reason = reader.string();
+						continue;
+				}
+				if ((tag & 7) === 4 || tag === 0) break;
+				reader.skip(tag & 7);
+			}
+			return message;
+		} finally {
+			reader.__tsProtoDecodeDepth = previousRecursionDepth;
+		}
+	},
+	fromJSON(object) {
+		return {
+			common: isSet$6(object.common) ? CommonApiData.fromJSON(object.common) : void 0,
+			openId: isSet$6(object.openId) ? globalThis.String(object.openId) : "",
+			mediaId: isSet$6(object.mediaId) ? globalThis.Number(object.mediaId) : 0,
+			reason: isSet$6(object.reason) ? globalThis.String(object.reason) : ""
+		};
+	},
+	toJSON(message) {
+		const obj = {};
+		if (message.common !== void 0) obj.common = CommonApiData.toJSON(message.common);
+		if (message.openId !== "") obj.openId = message.openId;
+		if (message.mediaId !== 0) obj.mediaId = Math.round(message.mediaId);
+		if (message.reason !== "") obj.reason = message.reason;
+		return obj;
+	},
+	create(base) {
+		return ReportVideoRequest.fromPartial(base ?? {});
+	},
+	fromPartial(object) {
+		const message = createBaseReportVideoRequest();
+		message.common = object.common !== void 0 && object.common !== null ? CommonApiData.fromPartial(object.common) : void 0;
+		message.openId = object.openId ?? "";
+		message.mediaId = object.mediaId ?? 0;
+		message.reason = object.reason ?? "";
 		return message;
 	}
 };
@@ -7079,6 +7165,23 @@ var ApiUser = class extends BaseApi {
 		});
 		this.updateCachedShareMark(updateShareMark);
 		return { mediaExists };
+	}
+	async reportVideo({ openId, mediaId, reason }) {
+		return this.invokeProtoApi({
+			path: "/media-hub/user/report-video",
+			requestMeta: ReportVideoRequest,
+			responseMeta: CommonResponseData,
+			requestBody: {
+				common: this.obtainCommonApiData(),
+				openId,
+				mediaId,
+				reason
+			},
+			extractor: {
+				commonOf: (response) => response,
+				bodyOf: () => {}
+			}
+		});
 	}
 };
 //#endregion

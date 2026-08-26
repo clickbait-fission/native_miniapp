@@ -706,6 +706,11 @@ declare class ApiUser extends BaseApi {
   }): Promise<{
     mediaExists: boolean;
   }>;
+  reportVideo({ openId, mediaId, reason }: {
+    openId: string;
+    mediaId: number;
+    reason: string;
+  }): Promise<void>;
 }
 //#endregion
 //#region src/models/client/api/ad.d.ts
