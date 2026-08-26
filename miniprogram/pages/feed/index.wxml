@@ -21,7 +21,8 @@
                        id="{{item.id}}"
                        class="video"
                        src="{{item.media.url}}"
-                       autoplay="{{true}}"
+                       autoplay="{{autoplay}}"
+                       muted="{{muted}}"
                        loop="{{true}}"
                        show-progress="{{true}}"
                        show-fullscreen-btn="{{true}}"
@@ -32,6 +33,7 @@
                        data-id="{{item.id}}"
                        data-media-id="{{item.media.id}}"/>
                 <view class="actions">
+                    <image class="more" mode="aspectFit" src="/assets/ellipsis-vertical.svg" bind:tap="onTapMore"/>
                     <view class="favorite">
                         <action-favorite mediaId="{{item.media.id}}" isFavorite="{{item.media.isFavorite}}"/>
                     </view>
@@ -51,4 +53,40 @@
         </swiper-item>
     </swiper>
     <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
+
+    <page-container show="{{popContent !== ''}}" position="bottom" bind:afterleave="onMoreLeave">
+        <view wx:if="{{popContent === 'menu'}}" class="popup menu">
+            <view class="cell" bind:tap="onTapReport">
+                <image class="icon" mode="aspectFit" src="/assets/triangle-alert.svg"/>
+            </view>
+            <view class="cell" bind:tap="onTapReport">
+                <view class="text">
+                    <text>举报</text>
+                </view>
+            </view>
+        </view>
+
+        <view wx:if="{{popContent === 'report'}}" class="popup report">
+            <view wx:for="{{reportReason}}" class="cell" data-reason="{{item}}" bind:tap="onTapReportConfirm">
+                {{item}}
+            </view>
+            <view class="cell other" bind:tap="onTapReportCustom">
+                <text class="text">其他原因</text>
+                <image class="icon" mode="aspectFit" src="/assets/chevron-right.svg"/>
+            </view>
+        </view>
+
+        <form wx:if="{{popContent === 'custom-reason'}}" class="popup custom-reason" bind:submit="onTapReportCustomSubmit">
+            <textarea class="input"
+                      name="reason"
+                      placeholder="请输入举报原因"
+                      confirm-type="done"
+                      adjust-keyboard-to="bottom"
+                      focus="{{true}}"
+                      bind:confirm="onTapReportCustomConfirm"
+            />
+
+            <button class="submit" form-type="submit">提交</button>
+        </form>
+    </page-container>
 </view>

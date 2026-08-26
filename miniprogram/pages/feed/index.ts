@@ -253,12 +253,28 @@ Component({
         _finishReported: false,
         _swiperInAnim: false,
         _swiperAnimResetTimer: null as number | null,
+        autoplay: true,
+        muted: kDev,
         circle: false,
         hasMedias: false,
         medias: null as MediaInSpan[] | null,
         isEmpty: false,
         vars: '',
         current: 0,
+        popContent: '',
+        reportReason: [
+            '广告',
+            '色情,暴力',
+            '侵权,抄袭',
+            '未成年人不当行为',
+            '内容质量差,引人不适',
+            '违反法规,政治敏感',
+            '标题党,封面与内容不符',
+            '无法播放',
+            '播放卡顿',
+            '清晰度差',
+            '暂停,快进,全屏等操作无响应',
+        ],
     },
     lifetimes: {
         created() {
@@ -271,6 +287,7 @@ Component({
             this.setData({
                 medias: this.data._span!.medias,
                 vars: computeVars(),
+                popContent: '',
             });
             this.shareCheck();
             this.checkFetchMore();
@@ -599,6 +616,56 @@ Component({
                 path: kHome,
                 target,
                 from,
+            });
+        },
+        onTapMore() {
+            this.setData({
+                popContent: 'menu',
+            });
+        },
+        onMoreLeave() {
+            this.setData({
+                popContent: '',
+            });
+        },
+        onTapReport() {
+            this.setData({
+                popContent: 'report',
+            });
+        },
+        onTapReportConfirm(event: WechatMiniprogram.BaseEvent) {
+            this.doReport(event.currentTarget.dataset.reason);
+        },
+        onTapReportCustom() {
+            this.setData({
+                popContent: 'custom-reason',
+            });
+        },
+        onTapReportCustomConfirm(event: WechatMiniprogram.TextareaConfirm) {
+            this.doReport(event.detail.value);
+        },
+        onTapReportCustomSubmit(event: WechatMiniprogram.FormSubmit) {
+            this.doReport(event.detail.value.reason);
+        },
+        doReport(reason: string) {
+            reason = reason.trim();
+
+            if (reason == '') {
+                wx.showToast({
+                    title: '请填写举报原因',
+                    icon: 'error',
+                });
+                return;
+            }
+
+            console.log(reason);
+
+            wx.showToast({
+                title: '已提交举报',
+                icon: 'success',
+            });
+            this.setData({
+                popContent: '',
             });
         }
     },
