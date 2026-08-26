@@ -1,7 +1,7 @@
 import {IAppOption} from "../../../typings";
 import {skCheckBehavior} from "../../behaviors/sk_behavior";
 import {shareBehavior} from "../../behaviors/share_behavior";
-import {ShareTarget, UserInfo} from "../../api";
+import {Media, ShareTarget, UserInfo} from "../../api";
 import {kAvatar, kDev, kHome, kNickName, kShareImage, kShareTitle} from "../../utils/consts";
 import {computeVars, safeBack, sleep} from "../../utils/util";
 
@@ -31,6 +31,7 @@ Component({
         nickname: '',
         avatar: '',
         statistics: '',
+        hot: [] as Media[],
     },
     lifetimes: {
         attached() {
@@ -120,13 +121,28 @@ Component({
                     }
                 }
 
+                let hot: Media[];
+                try {
+                    hot = await app.api.getHot({
+                        openId: await app.api.authedOpenId(),
+                        upId: this.properties.uid,
+                    });
+                } catch (err) {
+                    if (kDev) {
+                        console.error('get hot video', err);
+                    }
+                    await sleep(1);
+                    continue;
+                }
+
                 this.setData({
                     ready: true,
                     showAction,
                     isFan,
                     nickname: userInfo?.nickname ?? kNickName,
                     avatar: userInfo?.avatar ?? kAvatar,
-                    statistics: userInfo == null ? '' : `视频:${userInfo.videoCount} 播放:${userInfo.videoViewCount} 粉丝:${userInfo.fanCount} 关注:${userInfo.followCount}`
+                    statistics: userInfo == null ? '' : `视频:${userInfo.videoCount} 播放:${userInfo.videoViewCount} 粉丝:${userInfo.fanCount} 关注:${userInfo.followCount}`,
+                    hot,
                 });
             }
         },
@@ -183,6 +199,16 @@ Component({
                     icon: 'success',
                     title: `暂时无法${opName},请重试`,
                 });
+            });
+        },
+        onTapVideo(event: WechatMiniprogram.BaseEvent) {
+            const index = event.currentTarget.dataset.index as number;
+            app.api.navigateTo({
+                path: '/pages/feed/index',
+                params: {
+                    inputMedias: JSON.stringify(this.data.hot),
+                    inputIndex: index,
+                },
             });
         },
     }

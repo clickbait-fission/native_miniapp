@@ -1134,6 +1134,16 @@ interface $ZodNumber<Input = unknown> extends $ZodType {
   _zod: $ZodNumberInternals<Input>;
 }
 declare const $ZodNumber: $constructor<$ZodNumber>;
+interface $ZodBooleanDef extends $ZodTypeDef {
+  type: "boolean";
+  coerce?: boolean;
+  checks?: $ZodCheck<boolean>[];
+}
+interface $ZodBooleanInternals<T = unknown> extends $ZodTypeInternals<boolean, T> {
+  pattern: RegExp;
+  def: $ZodBooleanDef;
+  isst: $ZodIssueInvalidType;
+}
 type OptionalOutSchema = {
   _zod: {
     optout: "optional";
@@ -1434,6 +1444,8 @@ interface _ZodMiniNumber<T extends $ZodNumberInternals<unknown> = $ZodNumberInte
 }
 interface ZodMiniNumber<Input = unknown> extends _ZodMiniNumber<$ZodNumberInternals<Input>>, $ZodNumber<Input> {}
 declare const ZodMiniNumber: $constructor<ZodMiniNumber>;
+interface ZodMiniBoolean<T = unknown> extends _ZodMiniType<$ZodBooleanInternals<T>> {}
+declare const ZodMiniBoolean: $constructor<ZodMiniBoolean>;
 interface ZodMiniObject<
 /** @ts-ignore Cast variance */
 out Shape extends $ZodShape = $ZodShape, out Config extends $ZodObjectConfig = $strip> extends ZodMiniType<any, any, $ZodObjectInternals<Shape, Config>>, $ZodObject<Shape, Config> {
@@ -1531,6 +1543,42 @@ declare function genRandomText(opts?: {
   count?: number | undefined;
 }): any;
 //#endregion
+//#region src/compatible/parse.d.ts
+declare const zMedia: ZodMiniObject<{
+  id: ZodMiniNumber<number>;
+  url: ZodMiniString<string>;
+  cover: ZodMiniString<string>;
+  title: ZodMiniString<string>;
+  ownerId: ZodMiniNumber<number>;
+  ownerNickname: ZodMiniOptional<ZodMiniString<string>>;
+  ownerAvatar: ZodMiniOptional<ZodMiniString<string>>;
+  viewCount: ZodMiniNumber<number>;
+  isFavorite: ZodMiniBoolean<boolean>;
+}, $strip>;
+type TsMedia = output<typeof zMedia>;
+declare function parseTsMedia(object: unknown): {
+  id: number;
+  url: string;
+  cover: string;
+  title: string;
+  ownerId: number;
+  ownerNickname?: string | undefined;
+  ownerAvatar?: string | undefined;
+  viewCount: number;
+  isFavorite: boolean;
+};
+declare function parseTsMediaArray(object: unknown): {
+  id: number;
+  url: string;
+  cover: string;
+  title: string;
+  ownerId: number;
+  ownerNickname?: string | undefined;
+  ownerAvatar?: string | undefined;
+  viewCount: number;
+  isFavorite: boolean;
+}[];
+//#endregion
 //#region src/index.d.ts
 declare const Api_base: Class$1<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd & ExtShare, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd & typeof ExtShare>;
 declare class Api extends Api_base {
@@ -1539,5 +1587,5 @@ declare class Api extends Api_base {
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api, Article, MediaAsset as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareQuery, type ShareTarget, BasicUserInfo as UserInfo, genRandomText };
+export { Api, type Article, type TsMedia as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareQuery, type ShareTarget, BasicUserInfo as UserInfo, genRandomText, parseTsMedia, parseTsMediaArray };
 //# sourceMappingURL=index.d.ts.map

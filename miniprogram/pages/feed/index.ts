@@ -1,5 +1,5 @@
 import {IAppOption} from "../../../typings";
-import {Media, ShareItem, ShareTarget} from "../../api";
+import {Media, parseTsMediaArray, ShareItem, ShareTarget} from "../../api";
 import {kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
 import {computeVars, safeBack, sleep} from "../../utils/util";
 import {skCheckBehavior} from "../../behaviors/sk_behavior";
@@ -222,6 +222,16 @@ Component({
         shareBehavior,
     ],
     properties: {
+        inputMedias: {
+            type: Array,
+            optionalTypes: [String, null],
+            value: null,
+        },
+        inputIndex: {
+            type: Number,
+            optionalTypes: [String, null],
+            value: null,
+        },
         top: {
             type: Number,
             optionalTypes: [null],
@@ -230,6 +240,7 @@ Component({
     },
     data: {
         _active: false,
+        _inputCheck: false,
         _shareChecked: false,
         _shareCheckPromise: null as Promise<void> | null,
         _shareMedia: undefined as number | undefined,
@@ -256,12 +267,14 @@ Component({
         },
         attached() {
             this.data._active = true;
+            this.inputCheck();
             this.setData({
                 medias: this.data._span!.medias,
                 vars: computeVars(),
             });
             this.shareCheck();
             this.checkFetchMore();
+            this.sync();
         },
         detached() {
             this.data._active = false;
@@ -280,6 +293,54 @@ Component({
         },
     },
     methods: {
+        inputCheck() {
+            if (this.data._inputCheck) {
+                return;
+            }
+            this.data._inputCheck = true;
+
+            if (this.properties.inputMedias == null) {
+                return;
+            }
+
+            try {
+                const medias = parseTsMediaArray(this.properties.inputMedias);
+                let index = 0;
+                if (this.properties.inputIndex != null) {
+                    switch (typeof this.properties.inputIndex) {
+                        case 'number':
+                            index = this.properties.inputIndex;
+                            break;
+                        case 'string':
+                            index = parseInt(this.properties.inputIndex);
+                            break;
+                        default:
+                            if (kDev) {
+                                console.error('unknown input index type', this.properties.inputIndex)
+                            }
+                            break;
+                    }
+                }
+
+                this.data._data = medias;
+                this.data._end = true;
+                this.data._span!.move(index);
+                this.data._span!.pickData(medias)
+
+                if (kDev) {
+                    console.log('feed has input', {
+                        inputMedias: this.properties.inputMedias,
+                        inputIndex: this.properties.inputIndex,
+                        medias,
+                        index,
+                    });
+                }
+            } catch (err) {
+                if (kDev) {
+                    console.error('parse input media', err);
+                }
+            }
+        },
         shareCheck() {
             if (this.data._shareChecked) {
                 return;

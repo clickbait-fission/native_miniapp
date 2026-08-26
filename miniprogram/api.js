@@ -2482,6 +2482,7 @@ const string$1 = (params) => {
 	return new RegExp(`^${regex}$`);
 };
 const number$1 = /^-?\d+(?:\.\d+)?$/;
+const boolean$1 = /^(?:true|false)$/i;
 //#endregion
 //#region node_modules/zod/v4/core/versions.js
 const version = {
@@ -2614,6 +2615,56 @@ const $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
 			inst,
 			...received ? { received } : {}
 		});
+		return payload;
+	};
+});
+const $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.pattern = boolean$1;
+	inst._zod.parse = (payload, _ctx) => {
+		if (def.coerce) try {
+			payload.value = Boolean(payload.value);
+		} catch (_) {}
+		const input = payload.value;
+		if (typeof input === "boolean") return payload;
+		payload.issues.push({
+			expected: "boolean",
+			code: "invalid_type",
+			input,
+			inst
+		});
+		return payload;
+	};
+});
+function handleArrayResult(result, final, index) {
+	if (result.issues.length) final.issues.push(...prefixIssues(index, result.issues));
+	final.value[index] = result.value;
+}
+const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!Array.isArray(input)) {
+			payload.issues.push({
+				expected: "array",
+				code: "invalid_type",
+				input,
+				inst
+			});
+			return payload;
+		}
+		payload.value = Array(input.length);
+		const proms = [];
+		for (let i = 0; i < input.length; i++) {
+			const item = input[i];
+			const result = def.element._zod.run({
+				value: item,
+				issues: []
+			}, ctx);
+			if (result instanceof Promise) proms.push(result.then((result) => handleArrayResult(result, payload, i)));
+			else handleArrayResult(result, payload, i);
+		}
+		if (proms.length) return Promise.all(proms).then(() => payload);
 		return payload;
 	};
 });
@@ -2855,6 +2906,13 @@ function _number(Class, params) {
 		...normalizeParams(params)
 	});
 }
+// @__NO_SIDE_EFFECTS__
+function _boolean(Class, params) {
+	return new Class({
+		type: "boolean",
+		...normalizeParams(params)
+	});
+}
 //#endregion
 //#region node_modules/zod/v4/mini/schemas.js
 const ZodMiniType = /*@__PURE__*/ $constructor("ZodMiniType", (inst, def) => {
@@ -2900,6 +2958,26 @@ const ZodMiniNumber = /*@__PURE__*/ $constructor("ZodMiniNumber", (inst, def) =>
 // @__NO_SIDE_EFFECTS__
 function number(params) {
 	return /* @__PURE__ */ _number(ZodMiniNumber, params);
+}
+const ZodMiniBoolean = /*@__PURE__*/ $constructor("ZodMiniBoolean", (inst, def) => {
+	$ZodBoolean.init(inst, def);
+	ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function boolean(params) {
+	return /* @__PURE__ */ _boolean(ZodMiniBoolean, params);
+}
+const ZodMiniArray = /*@__PURE__*/ $constructor("ZodMiniArray", (inst, def) => {
+	$ZodArray.init(inst, def);
+	ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function array(element, params) {
+	return new ZodMiniArray({
+		type: "array",
+		element,
+		...normalizeParams(params)
+	});
 }
 const ZodMiniObject = /*@__PURE__*/ $constructor("ZodMiniObject", (inst, def) => {
 	$ZodObject.init(inst, def);
@@ -6919,14 +6997,14 @@ var ApiUser = class extends BaseApi {
 		return this.followOp({
 			openId,
 			upId,
-			op: 0
+			op: "add"
 		});
 	}
 	removeFollow({ openId, upId }) {
 		return this.followOp({
 			openId,
 			upId,
-			op: 1
+			op: "remove"
 		});
 	}
 	async getHot({ openId, upId }) {
@@ -7548,6 +7626,28 @@ function findShareB64Json(path) {
 	}
 }
 //#endregion
+//#region src/compatible/parse.ts
+const zMedia = /* @__PURE__ */ object({
+	id: /* @__PURE__ */ number(),
+	url: /* @__PURE__ */ string(),
+	cover: /* @__PURE__ */ string(),
+	title: /* @__PURE__ */ string(),
+	ownerId: /* @__PURE__ */ number(),
+	ownerNickname: /* @__PURE__ */ optional(/* @__PURE__ */ string()),
+	ownerAvatar: /* @__PURE__ */ optional(/* @__PURE__ */ string()),
+	viewCount: /* @__PURE__ */ number(),
+	isFavorite: /* @__PURE__ */ boolean()
+});
+const zMediaArray = /* @__PURE__ */ array(zMedia);
+function parseTsMedia(object) {
+	if (typeof object === "string") return zMedia.parse(JSON.parse(object));
+	return zMedia.parse(object);
+}
+function parseTsMediaArray(object) {
+	if (typeof object === "string") return zMediaArray.parse(JSON.parse(object));
+	return zMediaArray.parse(object);
+}
+//#endregion
 //#region src/index.ts
 var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog, ApiReportSessionCorrupt, ApiMedia, ApiUser, ApiAd, ExtShare) {
 	constructor(appId, base, network) {
@@ -7561,6 +7661,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api, Article, MediaAsset as Media, BasicUserInfo as UserInfo, genRandomText };
+export { Api, BasicUserInfo as UserInfo, genRandomText, parseTsMedia, parseTsMediaArray };
 
 //# sourceMappingURL=index.js.map

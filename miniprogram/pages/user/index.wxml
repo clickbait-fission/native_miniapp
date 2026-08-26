@@ -1,5 +1,5 @@
 <view wx:if="{{!ready}}" class="page">
-    <spin-anim />
+    <spin-anim/>
 </view>
 
 <view wx:if="{{ready}}" class="page" style="{{vars}}">
@@ -16,11 +16,12 @@
                     <span class="uid">(@{{uid}})</span>
                 </view>
                 <button class="btn" bind:tap="onTapFollow">
-                    <image class="icon" mode="aspectFit" src="{{isFan ? '/assets/follow-remove.svg' : '/assets/follow-add.svg'}}" />
+                    <image class="icon" mode="aspectFit"
+                           src="{{isFan ? '/assets/follow-remove.svg' : '/assets/follow-add.svg'}}"/>
                     <text>{{isFan ? "取关" : "关注"}}</text>
                 </button>
                 <button class="btn" open-type="share">
-                    <image class="icon" mode="aspectFit" src="/assets/wechat.png" />
+                    <image class="icon" mode="aspectFit" src="/assets/wechat.png"/>
                     <text>分享</text>
                 </button>
             </view>
@@ -28,9 +29,26 @@
         </view>
     </view>
 
-    <view class="videos">
-        <scroll-view class="grid">
-
+    <view class="{{hot.length === 0 ? 'empty-hint' : 'videos'}}">
+        <scroll-view wx:if="{{hot.length > 0}}" class="hot-grid"
+                     scroll-y
+                     type="custom"
+                     enhanced="{{true}}"
+                     show-scrollbar="{{false}}">
+            <view class="grid">
+                <view wx:for="{{hot}}" wx:key="id" class="card" data-index="{{index}}" bind:tap="onTapVideo">
+                    <image class="cover" mode="aspectFill" src="{{item.cover}}" />
+                    <text class="title">{{item.title}}</text>
+                    <view class="view-count">
+                        <image class="icon" mode="aspectFit" src="/assets/eye.svg" />
+                        <text>{{item.viewCount}}</text>
+                    </view>
+                </view>
+            </view>
         </scroll-view>
+
+        <view wx:if="{{hot.length === 0}}">
+            他还没有发布任何视频
+        </view>
     </view>
 </view>
