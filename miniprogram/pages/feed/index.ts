@@ -417,7 +417,6 @@ Component({
                 }
 
                 this.data._data.push(...chunk);
-                this.data._end = this.data._data.length >= 6; //todo 模拟数据不足
                 this.data._span!.pickData(this.data._data);
                 if (!this.data._swiperInAnim) {
                     this.sync();
