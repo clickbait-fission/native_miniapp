@@ -2,7 +2,7 @@
 /**
  * A rigorous type alias for a class.
  */
-type Class<CtorArgs extends any[] = any[], InstanceType = {}, StaticType = {}, IsAbstract = false> = (abstract new (...args: any[]) => InstanceType) & StaticType;
+type Class$1<CtorArgs extends any[] = any[], InstanceType = {}, StaticType = {}, IsAbstract = false> = (abstract new (...args: any[]) => InstanceType) & StaticType;
 //#endregion
 //#region src/networks/network.d.ts
 type HttpMethod = 'OPTIONS' | 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'TRACE' | 'CONNECT';
@@ -744,6 +744,707 @@ declare class ApiAd extends BaseApi {
   }): Promise<void>;
 }
 //#endregion
+//#region node_modules/zod/v4/core/json-schema.d.cts
+type _JSONSchema = boolean | JSONSchema;
+type JSONSchema = {
+  [k: string]: unknown;
+  $schema?: "https://json-schema.org/draft/2020-12/schema" | "http://json-schema.org/draft-07/schema#" | "http://json-schema.org/draft-04/schema#";
+  $id?: string;
+  $anchor?: string;
+  $ref?: string;
+  $dynamicRef?: string;
+  $dynamicAnchor?: string;
+  $vocabulary?: Record<string, boolean>;
+  $comment?: string;
+  $defs?: Record<string, JSONSchema>;
+  type?: "object" | "array" | "string" | "number" | "boolean" | "null" | "integer";
+  additionalItems?: _JSONSchema;
+  unevaluatedItems?: _JSONSchema;
+  prefixItems?: _JSONSchema[];
+  items?: _JSONSchema | _JSONSchema[];
+  contains?: _JSONSchema;
+  additionalProperties?: _JSONSchema;
+  unevaluatedProperties?: _JSONSchema;
+  properties?: Record<string, _JSONSchema>;
+  patternProperties?: Record<string, _JSONSchema>;
+  dependentSchemas?: Record<string, _JSONSchema>;
+  propertyNames?: _JSONSchema;
+  if?: _JSONSchema;
+  then?: _JSONSchema;
+  else?: _JSONSchema;
+  allOf?: JSONSchema[];
+  anyOf?: JSONSchema[];
+  oneOf?: JSONSchema[];
+  not?: _JSONSchema;
+  multipleOf?: number;
+  maximum?: number;
+  exclusiveMaximum?: number | boolean;
+  minimum?: number;
+  exclusiveMinimum?: number | boolean;
+  maxLength?: number;
+  minLength?: number;
+  pattern?: string;
+  maxItems?: number;
+  minItems?: number;
+  uniqueItems?: boolean;
+  maxContains?: number;
+  minContains?: number;
+  maxProperties?: number;
+  minProperties?: number;
+  required?: string[];
+  dependentRequired?: Record<string, string[]>;
+  enum?: Array<string | number | boolean | null>;
+  const?: string | number | boolean | null;
+  id?: string;
+  title?: string;
+  description?: string;
+  default?: unknown;
+  deprecated?: boolean;
+  readOnly?: boolean;
+  writeOnly?: boolean;
+  nullable?: boolean;
+  examples?: unknown[];
+  format?: string;
+  contentMediaType?: string;
+  contentEncoding?: string;
+  contentSchema?: JSONSchema;
+  _prefault?: unknown;
+};
+type BaseSchema = JSONSchema;
+//#endregion
+//#region node_modules/zod/v4/core/standard-schema.d.cts
+/** The Standard interface. */
+interface StandardTypedV1<Input = unknown, Output = Input> {
+  /** The Standard properties. */
+  readonly "~standard": StandardTypedV1.Props<Input, Output>;
+}
+declare namespace StandardTypedV1 {
+  /** The Standard properties interface. */
+  interface Props<Input = unknown, Output = Input> {
+    /** The version number of the standard. */
+    readonly version: 1;
+    /** The vendor name of the schema library. */
+    readonly vendor: string;
+    /** Inferred types associated with the schema. */
+    readonly types?: Types<Input, Output> | undefined;
+  }
+  /** The Standard types interface. */
+  interface Types<Input = unknown, Output = Input> {
+    /** The input type of the schema. */
+    readonly input: Input;
+    /** The output type of the schema. */
+    readonly output: Output;
+  }
+  /** Infers the input type of a Standard. */
+  type InferInput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["input"];
+  /** Infers the output type of a Standard. */
+  type InferOutput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["output"];
+}
+/** The Standard Schema interface. */
+interface StandardSchemaV1<Input = unknown, Output = Input> {
+  /** The Standard Schema properties. */
+  readonly "~standard": StandardSchemaV1.Props<Input, Output>;
+}
+declare namespace StandardSchemaV1 {
+  /** The Standard Schema properties interface. */
+  interface Props<Input = unknown, Output = Input> extends StandardTypedV1.Props<Input, Output> {
+    /** Validates unknown input values. */
+    readonly validate: (value: unknown, options?: StandardSchemaV1.Options | undefined) => Result<Output> | Promise<Result<Output>>;
+  }
+  /** The result interface of the validate function. */
+  type Result<Output> = SuccessResult<Output> | FailureResult;
+  /** The result interface if validation succeeds. */
+  interface SuccessResult<Output> {
+    /** The typed output value. */
+    readonly value: Output;
+    /** The absence of issues indicates success. */
+    readonly issues?: undefined;
+  }
+  interface Options {
+    /** Implicit support for additional vendor-specific parameters, if needed. */
+    readonly libraryOptions?: Record<string, unknown> | undefined;
+  }
+  /** The result interface if validation fails. */
+  interface FailureResult {
+    /** The issues of failed validation. */
+    readonly issues: ReadonlyArray<Issue>;
+  }
+  /** The issue interface of the failure output. */
+  interface Issue {
+    /** The error message of the issue. */
+    readonly message: string;
+    /** The path of the issue, if any. */
+    readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined;
+  }
+  /** The path segment interface of the issue. */
+  interface PathSegment {
+    /** The key representing a path segment. */
+    readonly key: PropertyKey;
+  }
+  /** The Standard types interface. */
+  interface Types<Input = unknown, Output = Input> extends StandardTypedV1.Types<Input, Output> {}
+  /** Infers the input type of a Standard. */
+  type InferInput<Schema extends StandardTypedV1> = StandardTypedV1.InferInput<Schema>;
+  /** Infers the output type of a Standard. */
+  type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
+}
+//#endregion
+//#region node_modules/zod/v4/core/registries.d.cts
+declare const $output: unique symbol;
+type $output = typeof $output;
+declare const $input: unique symbol;
+type $input = typeof $input;
+type $replace<Meta, S extends $ZodType> = Meta extends $output ? output<S> : Meta extends $input ? input<S> : Meta extends (infer M)[] ? $replace<M, S>[] : Meta extends ((...args: infer P) => infer R) ? (...args: { [K in keyof P]: $replace<P[K], S>; }) => $replace<R, S> : Meta extends object ? { [K in keyof Meta]: $replace<Meta[K], S>; } : Meta;
+type MetadataType = object | undefined;
+declare class $ZodRegistry<Meta extends MetadataType = MetadataType, Schema extends $ZodType = $ZodType> {
+  _meta: Meta;
+  _schema: Schema;
+  _map: WeakMap<Schema, $replace<Meta, Schema>>;
+  _idmap: Map<string, Schema>;
+  add<S extends Schema>(schema: S, ..._meta: undefined extends Meta ? [$replace<Meta, S>?] : [$replace<Meta, S>]): this;
+  clear(): this;
+  remove(schema: Schema): this;
+  get<S extends Schema>(schema: S): $replace<Meta, S> | undefined;
+  has(schema: Schema): boolean;
+}
+//#endregion
+//#region node_modules/zod/v4/core/to-json-schema.d.cts
+type Processor<T extends $ZodType = $ZodType> = (schema: T, ctx: ToJSONSchemaContext, json: BaseSchema, params: ProcessParams) => void;
+interface ProcessParams {
+  schemaPath: $ZodType[];
+  path: (string | number)[];
+}
+interface Seen {
+  /** JSON Schema result for this Zod schema */
+  schema: BaseSchema;
+  /** A cached version of the schema that doesn't get overwritten during ref resolution */
+  def?: BaseSchema;
+  defId?: string | undefined;
+  /** Number of times this schema was encountered during traversal */
+  count: number;
+  /** Cycle path */
+  cycle?: (string | number)[] | undefined;
+  isParent?: boolean | undefined;
+  /** Schema to inherit JSON Schema properties from (set by processor for wrappers) */
+  ref?: $ZodType | null;
+  /** JSON Schema property path for this schema */
+  path?: (string | number)[] | undefined;
+}
+interface ToJSONSchemaContext {
+  processors: Record<string, Processor>;
+  metadataRegistry: $ZodRegistry<Record<string, any>>;
+  target: "draft-04" | "draft-07" | "draft-2020-12" | "openapi-3.0" | ({} & string);
+  unrepresentable: "throw" | "any";
+  override: (ctx: {
+    zodSchema: $ZodType;
+    jsonSchema: BaseSchema;
+    path: (string | number)[];
+  }) => void;
+  io: "input" | "output";
+  counter: number;
+  seen: Map<$ZodType, Seen>;
+  cycles: "ref" | "throw";
+  reused: "ref" | "inline";
+  external?: {
+    registry: $ZodRegistry<{
+      id?: string | undefined;
+    }>;
+    uri?: ((id: string) => string) | undefined;
+    defs: Record<string, BaseSchema>;
+  } | undefined;
+}
+//#endregion
+//#region node_modules/zod/v4/core/util.d.cts
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type Omit$1<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+type MakePartial<T, K extends keyof T> = Omit$1<T, K> & InexactPartial<Pick<T, K>>;
+type LoosePartial<T extends object> = InexactPartial<T> & {
+  [k: string]: unknown;
+};
+type InexactPartial<T> = { [P in keyof T]?: T[P] | undefined; };
+type Identity<T> = T;
+type Flatten<T> = Identity<{ [k in keyof T]: T[k]; }>;
+type Prettify<T> = { [K in keyof T]: T[K]; } & {};
+type AnyFunc = (...args: any[]) => any;
+type MaybeAsync<T> = T | Promise<T>;
+type Literal = string | number | bigint | boolean | null | undefined;
+type Primitive = string | number | symbol | bigint | boolean | null | undefined;
+type SafeParseResult<T> = SafeParseSuccess<T> | SafeParseError<T>;
+type SafeParseSuccess<T> = {
+  success: true;
+  data: T;
+  error?: never;
+};
+type SafeParseError<T> = {
+  success: false;
+  data?: never;
+  error: $ZodError<T>;
+};
+type PropValues = Record<string, Set<Primitive>>;
+type PrimitiveSet = Set<Primitive>;
+declare abstract class Class {
+  constructor(..._args: any[]);
+}
+//#endregion
+//#region node_modules/zod/v4/core/versions.d.cts
+declare const version: {
+  readonly major: 4;
+  readonly minor: 4;
+  readonly patch: number;
+};
+//#endregion
+//#region node_modules/zod/v4/core/schemas.d.cts
+interface ParseContext<T extends $ZodIssueBase = never> {
+  /** Customize error messages. */
+  readonly error?: $ZodErrorMap<T>;
+  /** Include the `input` field in issue objects. Default `false`. */
+  readonly reportInput?: boolean;
+  /** Skip eval-based fast path. Default `false`. */
+  readonly jitless?: boolean;
+}
+/** @internal */
+interface ParseContextInternal<T extends $ZodIssueBase = never> extends ParseContext<T> {
+  readonly async?: boolean | undefined;
+  readonly direction?: "forward" | "backward";
+  readonly skipChecks?: boolean;
+}
+interface ParsePayload<T = unknown> {
+  value: T;
+  issues: $ZodRawIssue[];
+  /** A way to mark a whole payload as aborted. Used in codecs/pipes. */
+  aborted?: boolean;
+  /** @internal Marks a value as a fallback that an outer wrapper (e.g.
+   * $ZodOptional) may override with its own interpretation when input was
+   * undefined. Set by $ZodCatch when catchValue substitutes and by every
+   * $ZodTransform invocation. */
+  fallback?: boolean | undefined;
+}
+type CheckFn<T> = (input: ParsePayload<T>) => MaybeAsync<void>;
+interface $ZodTypeDef {
+  type: "string" | "number" | "int" | "boolean" | "bigint" | "symbol" | "null" | "undefined" | "void" | "never" | "any" | "unknown" | "date" | "object" | "record" | "file" | "array" | "tuple" | "union" | "intersection" | "map" | "set" | "enum" | "literal" | "nullable" | "optional" | "nonoptional" | "success" | "transform" | "default" | "prefault" | "catch" | "nan" | "pipe" | "readonly" | "template_literal" | "promise" | "lazy" | "function" | "custom";
+  error?: $ZodErrorMap<never> | undefined;
+  checks?: $ZodCheck<never>[];
+}
+interface _$ZodTypeInternals {
+  /** The `@zod/core` version of this schema */
+  version: typeof version;
+  /** Schema definition. */
+  def: $ZodTypeDef;
+  /** @internal Randomly generated ID for this schema. */
+  /** @internal List of deferred initializers. */
+  deferred: AnyFunc[] | undefined;
+  /** @internal Parses input and runs all checks (refinements). */
+  run(payload: ParsePayload<any>, ctx: ParseContextInternal): MaybeAsync<ParsePayload>;
+  /** @internal Parses input, doesn't run checks. */
+  parse(payload: ParsePayload<any>, ctx: ParseContextInternal): MaybeAsync<ParsePayload>;
+  /** @internal  Stores identifiers for the set of traits implemented by this schema. */
+  traits: Set<string>;
+  /** @internal Indicates that a schema output type should be considered optional inside objects.
+   * @default Required
+   */
+  /** @internal */
+  optin?: "optional" | undefined;
+  /** @internal */
+  optout?: "optional" | undefined;
+  /** @internal The set of literal values that will pass validation. Must be an exhaustive set. Used to determine optionality in z.record().
+   *
+   * Defined on: enum, const, literal, null, undefined
+   * Passthrough: optional, nullable, branded, default, catch, pipe
+   * Todo: unions?
+   */
+  values?: PrimitiveSet | undefined;
+  /** Default value bubbled up from  */
+  /** @internal A set of literal discriminators used for the fast path in discriminated unions. */
+  propValues?: PropValues | undefined;
+  /** @internal This flag indicates that a schema validation can be represented with a regular expression. Used to determine allowable schemas in z.templateLiteral(). */
+  pattern: RegExp | undefined;
+  /** @internal The constructor function of this schema. */
+  constr: new (def: any) => $ZodType;
+  /** @internal A catchall object for bag metadata related to this schema. Commonly modified by checks using `onattach`. */
+  bag: Record<string, unknown>;
+  /** @internal The set of issues this schema might throw during type checking. */
+  isst: $ZodIssueBase;
+  /** @internal Subject to change, not a public API. */
+  processJSONSchema?: ((ctx: ToJSONSchemaContext, json: BaseSchema, params: ProcessParams) => void) | undefined;
+  /** An optional method used to override `toJSONSchema` logic. */
+  toJSONSchema?: () => unknown;
+  /** @internal The parent of this schema. Only set during certain clone operations. */
+  parent?: $ZodType | undefined;
+}
+/** @internal */
+interface $ZodTypeInternals<out O = unknown, out I = unknown> extends _$ZodTypeInternals {
+  /** @internal The inferred output type */
+  output: O;
+  /** @internal The inferred input type */
+  input: I;
+}
+type $ZodStandardSchema<T> = StandardSchemaV1.Props<input<T>, output<T>>;
+type SomeType$1 = {
+  _zod: _$ZodTypeInternals;
+};
+interface $ZodType<O = unknown, I = unknown, Internals extends $ZodTypeInternals<O, I> = $ZodTypeInternals<O, I>> {
+  _zod: Internals;
+  "~standard": $ZodStandardSchema<this>;
+}
+interface _$ZodType<T extends $ZodTypeInternals = $ZodTypeInternals> extends $ZodType<T["output"], T["input"], T> {}
+declare const $ZodType: $constructor<$ZodType>;
+interface $ZodStringDef extends $ZodTypeDef {
+  type: "string";
+  coerce?: boolean;
+  checks?: $ZodCheck<string>[];
+}
+interface $ZodStringInternals<Input> extends $ZodTypeInternals<string, Input> {
+  def: $ZodStringDef;
+  /** @deprecated Internal API, use with caution (not deprecated) */
+  pattern: RegExp;
+  /** @deprecated Internal API, use with caution (not deprecated) */
+  isst: $ZodIssueInvalidType;
+  bag: LoosePartial<{
+    minimum: number;
+    maximum: number;
+    patterns: Set<RegExp>;
+    format: string;
+    contentEncoding: string;
+  }>;
+}
+interface $ZodString<Input = unknown> extends _$ZodType<$ZodStringInternals<Input>> {}
+declare const $ZodString: $constructor<$ZodString>;
+interface $ZodNumberDef extends $ZodTypeDef {
+  type: "number";
+  coerce?: boolean;
+}
+interface $ZodNumberInternals<Input = unknown> extends $ZodTypeInternals<number, Input> {
+  def: $ZodNumberDef;
+  /** @deprecated Internal API, use with caution (not deprecated) */
+  pattern: RegExp;
+  /** @deprecated Internal API, use with caution (not deprecated) */
+  isst: $ZodIssueInvalidType;
+  bag: LoosePartial<{
+    minimum: number;
+    maximum: number;
+    exclusiveMinimum: number;
+    exclusiveMaximum: number;
+    format: string;
+    pattern: RegExp;
+  }>;
+}
+interface $ZodNumber<Input = unknown> extends $ZodType {
+  _zod: $ZodNumberInternals<Input>;
+}
+declare const $ZodNumber: $constructor<$ZodNumber>;
+type OptionalOutSchema = {
+  _zod: {
+    optout: "optional";
+  };
+};
+type OptionalInSchema = {
+  _zod: {
+    optin: "optional";
+  };
+};
+type $InferObjectOutput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : Record<string, output<T[keyof T]>> : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalOutSchema ? never : k]: T[k]["_zod"]["output"]; } & { -readonly [k in keyof T as T[k] extends OptionalOutSchema ? k : never]?: T[k]["_zod"]["output"]; } & Extra>;
+type $InferObjectInput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : Record<string, input<T[keyof T]>> : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalInSchema ? never : k]: T[k]["_zod"]["input"]; } & { -readonly [k in keyof T as T[k] extends OptionalInSchema ? k : never]?: T[k]["_zod"]["input"]; } & Extra>;
+type $ZodObjectConfig = {
+  out: Record<string, unknown>;
+  in: Record<string, unknown>;
+};
+type $strip = {
+  out: {};
+  in: {};
+};
+type $ZodShape = Readonly<{
+  [k: string]: $ZodType;
+}>;
+interface $ZodObjectDef<Shape extends $ZodShape = $ZodShape> extends $ZodTypeDef {
+  type: "object";
+  shape: Shape;
+  catchall?: $ZodType | undefined;
+}
+interface $ZodObjectInternals<
+/** @ts-ignore Cast variance */
+out Shape extends $ZodShape = $ZodShape, out Config extends $ZodObjectConfig = $ZodObjectConfig> extends _$ZodTypeInternals {
+  def: $ZodObjectDef<Shape>;
+  config: Config;
+  isst: $ZodIssueInvalidType | $ZodIssueUnrecognizedKeys;
+  propValues: PropValues;
+  output: $InferObjectOutput<Shape, Config["out"]>;
+  input: $InferObjectInput<Shape, Config["in"]>;
+  optin?: "optional" | undefined;
+  optout?: "optional" | undefined;
+}
+type $ZodLooseShape = Record<string, any>;
+interface $ZodObject<
+/** @ts-ignore Cast variance */
+out Shape extends Readonly<$ZodShape> = Readonly<$ZodShape>, out Params extends $ZodObjectConfig = $ZodObjectConfig> extends $ZodType<any, any, $ZodObjectInternals<Shape, Params>> {}
+declare const $ZodObject: $constructor<$ZodObject>;
+type $InferUnionOutput<T extends SomeType$1> = T extends any ? output<T> : never;
+type $InferUnionInput<T extends SomeType$1> = T extends any ? input<T> : never;
+interface $ZodUnionDef<Options extends readonly SomeType$1[] = readonly $ZodType[]> extends $ZodTypeDef {
+  type: "union";
+  options: Options;
+  inclusive?: boolean;
+}
+type IsOptionalIn<T extends SomeType$1> = T extends OptionalInSchema ? true : false;
+type IsOptionalOut<T extends SomeType$1> = T extends OptionalOutSchema ? true : false;
+interface $ZodUnionInternals<T extends readonly SomeType$1[] = readonly $ZodType[]> extends _$ZodTypeInternals {
+  def: $ZodUnionDef<T>;
+  isst: $ZodIssueInvalidUnion;
+  pattern: T[number]["_zod"]["pattern"];
+  values: T[number]["_zod"]["values"];
+  output: $InferUnionOutput<T[number]>;
+  input: $InferUnionInput<T[number]>;
+  optin: IsOptionalIn<T[number]> extends false ? "optional" | undefined : "optional";
+  optout: IsOptionalOut<T[number]> extends false ? "optional" | undefined : "optional";
+}
+interface $ZodLiteralDef<T extends Literal> extends $ZodTypeDef {
+  type: "literal";
+  values: T[];
+}
+interface $ZodLiteralInternals<T extends Literal = Literal> extends $ZodTypeInternals<T, T> {
+  def: $ZodLiteralDef<T>;
+  values: Set<T>;
+  pattern: RegExp;
+  isst: $ZodIssueInvalidValue;
+}
+interface $ZodOptionalDef<T extends SomeType$1 = $ZodType> extends $ZodTypeDef {
+  type: "optional";
+  innerType: T;
+}
+interface $ZodOptionalInternals<T extends SomeType$1 = $ZodType> extends $ZodTypeInternals<output<T> | undefined, input<T> | undefined> {
+  def: $ZodOptionalDef<T>;
+  optin: "optional";
+  optout: "optional";
+  isst: never;
+  values: T["_zod"]["values"];
+  pattern: T["_zod"]["pattern"];
+}
+interface $ZodOptional<T extends SomeType$1 = $ZodType> extends $ZodType {
+  _zod: $ZodOptionalInternals<T>;
+}
+declare const $ZodOptional: $constructor<$ZodOptional>;
+//#endregion
+//#region node_modules/zod/v4/core/checks.d.cts
+interface $ZodCheckDef {
+  check: string;
+  error?: $ZodErrorMap<never> | undefined;
+  /** If true, no later checks will be executed if this check fails. Default `false`. */
+  abort?: boolean | undefined;
+  /** If provided, the check runs only when this returns `true`. By default, it is skipped if prior parsing produced aborting issues. */
+  when?: ((payload: ParsePayload) => boolean) | undefined;
+}
+interface $ZodCheckInternals<T> {
+  def: $ZodCheckDef;
+  /** The set of issues this check might throw. */
+  issc?: $ZodIssueBase;
+  check(payload: ParsePayload<T>): MaybeAsync<void>;
+  onattach: ((schema: $ZodType) => void)[];
+}
+interface $ZodCheck<in T = never> {
+  _zod: $ZodCheckInternals<T>;
+}
+declare const $ZodCheck: $constructor<$ZodCheck<any>>;
+type $ZodStringFormats = "email" | "url" | "emoji" | "uuid" | "guid" | "nanoid" | "cuid" | "cuid2" | "ulid" | "xid" | "ksuid" | "datetime" | "date" | "time" | "duration" | "ipv4" | "ipv6" | "cidrv4" | "cidrv6" | "base64" | "base64url" | "json_string" | "e164" | "lowercase" | "uppercase" | "regex" | "jwt" | "starts_with" | "ends_with" | "includes";
+//#endregion
+//#region node_modules/zod/v4/core/errors.d.cts
+interface $ZodIssueBase {
+  readonly code?: string;
+  readonly input?: unknown;
+  readonly path: PropertyKey[];
+  readonly message: string;
+}
+type $ZodInvalidTypeExpected = "string" | "number" | "int" | "boolean" | "bigint" | "symbol" | "undefined" | "null" | "never" | "void" | "date" | "array" | "object" | "tuple" | "record" | "map" | "set" | "file" | "nonoptional" | "nan" | "function" | (string & {});
+interface $ZodIssueInvalidType<Input = unknown> extends $ZodIssueBase {
+  readonly code: "invalid_type";
+  readonly expected: $ZodInvalidTypeExpected;
+  readonly input?: Input;
+}
+interface $ZodIssueTooBig<Input = unknown> extends $ZodIssueBase {
+  readonly code: "too_big";
+  readonly origin: "number" | "int" | "bigint" | "date" | "string" | "array" | "set" | "file" | (string & {});
+  readonly maximum: number | bigint;
+  readonly inclusive?: boolean;
+  readonly exact?: boolean;
+  readonly input?: Input;
+}
+interface $ZodIssueTooSmall<Input = unknown> extends $ZodIssueBase {
+  readonly code: "too_small";
+  readonly origin: "number" | "int" | "bigint" | "date" | "string" | "array" | "set" | "file" | (string & {});
+  readonly minimum: number | bigint;
+  /** True if the allowable range includes the minimum */
+  readonly inclusive?: boolean;
+  /** True if the allowed value is fixed (e.g.` z.length(5)`), not a range (`z.minLength(5)`) */
+  readonly exact?: boolean;
+  readonly input?: Input;
+}
+interface $ZodIssueInvalidStringFormat extends $ZodIssueBase {
+  readonly code: "invalid_format";
+  readonly format: $ZodStringFormats | (string & {});
+  readonly pattern?: string;
+  readonly input?: string;
+}
+interface $ZodIssueNotMultipleOf<Input extends number | bigint = number | bigint> extends $ZodIssueBase {
+  readonly code: "not_multiple_of";
+  readonly divisor: number;
+  readonly input?: Input;
+}
+interface $ZodIssueUnrecognizedKeys extends $ZodIssueBase {
+  readonly code: "unrecognized_keys";
+  readonly keys: string[];
+  readonly input?: Record<string, unknown>;
+}
+interface $ZodIssueInvalidUnionNoMatch extends $ZodIssueBase {
+  readonly code: "invalid_union";
+  readonly errors: $ZodIssue[][];
+  readonly input?: unknown;
+  readonly discriminator?: string | undefined;
+  readonly options?: Primitive[];
+  readonly inclusive?: true;
+}
+interface $ZodIssueInvalidUnionMultipleMatch extends $ZodIssueBase {
+  readonly code: "invalid_union";
+  readonly errors: [];
+  readonly input?: unknown;
+  readonly discriminator?: string | undefined;
+  readonly inclusive: false;
+}
+type $ZodIssueInvalidUnion = $ZodIssueInvalidUnionNoMatch | $ZodIssueInvalidUnionMultipleMatch;
+interface $ZodIssueInvalidKey<Input = unknown> extends $ZodIssueBase {
+  readonly code: "invalid_key";
+  readonly origin: "map" | "record";
+  readonly issues: $ZodIssue[];
+  readonly input?: Input;
+}
+interface $ZodIssueInvalidElement<Input = unknown> extends $ZodIssueBase {
+  readonly code: "invalid_element";
+  readonly origin: "map" | "set";
+  readonly key: unknown;
+  readonly issues: $ZodIssue[];
+  readonly input?: Input;
+}
+interface $ZodIssueInvalidValue<Input = unknown> extends $ZodIssueBase {
+  readonly code: "invalid_value";
+  readonly values: Primitive[];
+  readonly input?: Input;
+}
+interface $ZodIssueCustom extends $ZodIssueBase {
+  readonly code: "custom";
+  readonly params?: Record<string, any> | undefined;
+  readonly input?: unknown;
+}
+type $ZodIssue = $ZodIssueInvalidType | $ZodIssueTooBig | $ZodIssueTooSmall | $ZodIssueInvalidStringFormat | $ZodIssueNotMultipleOf | $ZodIssueUnrecognizedKeys | $ZodIssueInvalidUnion | $ZodIssueInvalidKey | $ZodIssueInvalidElement | $ZodIssueInvalidValue | $ZodIssueCustom;
+type $ZodInternalIssue<T extends $ZodIssueBase = $ZodIssue> = T extends any ? RawIssue<T> : never;
+type RawIssue<T extends $ZodIssueBase> = T extends any ? Flatten<MakePartial<T, "message" | "path"> & {
+  /** The input data */
+  readonly input: unknown;
+  /** The schema or check that originated this issue. */
+  readonly inst?: $ZodType | $ZodCheck;
+  /** If `true`, Zod will continue executing checks/refinements after this issue. */
+  readonly continue?: boolean | undefined;
+} & Record<string, unknown>> : never;
+type $ZodRawIssue<T extends $ZodIssueBase = $ZodIssue> = $ZodInternalIssue<T>;
+interface $ZodErrorMap<T extends $ZodIssueBase = $ZodIssue> {
+  (issue: $ZodRawIssue<T>): {
+    message: string;
+  } | string | undefined | null;
+}
+interface $ZodError<T = unknown> extends Error {
+  type: T;
+  issues: $ZodIssue[];
+  _zod: {
+    output: T;
+    def: $ZodIssue[];
+  };
+  stack?: string;
+  name: string;
+}
+declare const $ZodError: $constructor<$ZodError>;
+//#endregion
+//#region node_modules/zod/v4/core/core.d.cts
+type ZodTrait = {
+  _zod: {
+    def: any;
+    [k: string]: any;
+  };
+};
+interface $constructor<T extends ZodTrait, D = T["_zod"]["def"]> {
+  new (def: D): T;
+  init(inst: T, def: D): asserts inst is T;
+}
+declare function $constructor<T extends ZodTrait, D = T["_zod"]["def"]>(name: string, initializer: (inst: T, def: D) => void, params?: {
+  Parent?: typeof Class;
+}): $constructor<T, D>;
+declare const $brand: unique symbol;
+type $brand<T extends string | number | symbol = string | number | symbol> = {
+  [$brand]: { [k in T]: true; };
+};
+type $ZodBranded<T extends SomeType$1, Brand extends string | number | symbol, Dir extends "in" | "out" | "inout" = "out"> = T & (Dir extends "inout" ? {
+  _zod: {
+    input: input<T> & $brand<Brand>;
+    output: output<T> & $brand<Brand>;
+  };
+} : Dir extends "in" ? {
+  _zod: {
+    input: input<T> & $brand<Brand>;
+  };
+} : {
+  _zod: {
+    output: output<T> & $brand<Brand>;
+  };
+});
+type input<T> = T extends {
+  _zod: {
+    input: any;
+  };
+} ? T["_zod"]["input"] : unknown;
+type output<T> = T extends {
+  _zod: {
+    output: any;
+  };
+} ? T["_zod"]["output"] : unknown;
+//#endregion
+//#region node_modules/zod/v4/mini/schemas.d.cts
+type SomeType = SomeType$1;
+interface ZodMiniType<out Output = unknown, out Input = unknown, out Internals extends $ZodTypeInternals<Output, Input> = $ZodTypeInternals<Output, Input>> extends $ZodType<Output, Input, Internals> {
+  type: Internals["def"]["type"];
+  check(...checks: (CheckFn<output<this>> | $ZodCheck<output<this>>)[]): this;
+  with(...checks: (CheckFn<output<this>> | $ZodCheck<output<this>>)[]): this;
+  clone(def?: Internals["def"], params?: {
+    parent: boolean;
+  }): this;
+  register<R extends $ZodRegistry>(registry: R, ...meta: this extends R["_schema"] ? undefined extends R["_meta"] ? [$replace<R["_meta"], this>?] : [$replace<R["_meta"], this>] : ["Incompatible schema"]): this;
+  brand<T extends PropertyKey = PropertyKey, Dir extends "in" | "out" | "inout" = "out">(value?: T): PropertyKey extends T ? this : $ZodBranded<this, T, Dir>;
+  def: Internals["def"];
+  parse(data: unknown, params?: ParseContext<$ZodIssue>): output<this>;
+  safeParse(data: unknown, params?: ParseContext<$ZodIssue>): SafeParseResult<output<this>>;
+  parseAsync(data: unknown, params?: ParseContext<$ZodIssue>): Promise<output<this>>;
+  safeParseAsync(data: unknown, params?: ParseContext<$ZodIssue>): Promise<SafeParseResult<output<this>>>;
+  apply<T>(fn: (schema: this) => T): T;
+}
+interface _ZodMiniType<out Internals extends $ZodTypeInternals = $ZodTypeInternals> extends ZodMiniType<any, any, Internals> {}
+declare const ZodMiniType: $constructor<ZodMiniType>;
+interface _ZodMiniString<T extends $ZodStringInternals<unknown> = $ZodStringInternals<unknown>> extends _ZodMiniType<T>, $ZodString<T["input"]> {
+  _zod: T;
+}
+interface ZodMiniString<Input = unknown> extends _ZodMiniString<$ZodStringInternals<Input>>, $ZodString<Input> {}
+declare const ZodMiniString: $constructor<ZodMiniString>;
+interface _ZodMiniNumber<T extends $ZodNumberInternals<unknown> = $ZodNumberInternals<unknown>> extends _ZodMiniType<T>, $ZodNumber<T["input"]> {
+  _zod: T;
+}
+interface ZodMiniNumber<Input = unknown> extends _ZodMiniNumber<$ZodNumberInternals<Input>>, $ZodNumber<Input> {}
+declare const ZodMiniNumber: $constructor<ZodMiniNumber>;
+interface ZodMiniObject<
+/** @ts-ignore Cast variance */
+out Shape extends $ZodShape = $ZodShape, out Config extends $ZodObjectConfig = $strip> extends ZodMiniType<any, any, $ZodObjectInternals<Shape, Config>>, $ZodObject<Shape, Config> {
+  shape: Shape;
+}
+declare const ZodMiniObject: $constructor<ZodMiniObject>;
+interface ZodMiniUnion<T extends readonly SomeType[] = readonly $ZodType[]> extends _ZodMiniType<$ZodUnionInternals<T>> {}
+declare const ZodMiniUnion: $constructor<ZodMiniUnion>;
+interface ZodMiniLiteral<T extends Literal = Literal> extends _ZodMiniType<$ZodLiteralInternals<T>> {}
+declare const ZodMiniLiteral: $constructor<ZodMiniLiteral>;
+interface ZodMiniOptional<T extends SomeType = $ZodType> extends _ZodMiniType<$ZodOptionalInternals<T>>, $ZodOptional<T> {}
+declare const ZodMiniOptional: $constructor<ZodMiniOptional>;
+//#endregion
 //#region src/apis/ext_share.d.ts
 type ShareItem = {
   type: 'media';
@@ -772,19 +1473,27 @@ type ShareObject = {
   query: string;
   imageUrl: string;
 };
-type ShareTarget = 'message' | 'timeline' | 'favorite' | string;
-type ShareQuery = {
-  media?: number;
-  user?: number;
-  shareTarget: ShareTarget;
-  timestamp: number;
-  shareId: string;
-  sourceUser: string;
-  sourceMark: string;
-  enterOpts: Omit<OpenApp, 'path'> & {
-    shareId?: string | undefined;
-  };
-};
+declare const zShareTarget: ZodMiniUnion<readonly [ZodMiniLiteral<"favorite" | "message" | "timeline">, ZodMiniString<string>]>;
+type ShareTarget = output<typeof zShareTarget>;
+declare const zShareQuery: ZodMiniObject<{
+  media: ZodMiniOptional<ZodMiniNumber<number>>;
+  user: ZodMiniOptional<ZodMiniNumber<number>>;
+  shareTarget: ZodMiniUnion<readonly [ZodMiniLiteral<"favorite" | "message" | "timeline">, ZodMiniString<string>]>;
+  timestamp: ZodMiniNumber<number>;
+  shareId: ZodMiniString<string>;
+  sourceUser: ZodMiniString<string>;
+  sourceMark: ZodMiniString<string>;
+  enterOpts: ZodMiniObject<{
+    opts: ZodMiniObject<{
+      scene: ZodMiniOptional<ZodMiniNumber<number>>;
+      chatType: ZodMiniOptional<ZodMiniNumber<number>>;
+      groupEncryptedData: ZodMiniOptional<ZodMiniString<string>>;
+      groupIv: ZodMiniOptional<ZodMiniString<string>>;
+    }, $strip>;
+    shareId: ZodMiniOptional<ZodMiniString<string>>;
+  }, $strip>;
+}, $strip>;
+type ShareQuery = output<typeof zShareQuery>;
 declare class ExtShare extends BaseApi {
   createShare(param: ShareParam): {
     title: string;
@@ -792,7 +1501,24 @@ declare class ExtShare extends BaseApi {
     query: string;
     imageUrl: string;
   };
-  parseShareParam(share: string): ShareQuery | undefined;
+  parseShareParam(share: string): {
+    media?: number | undefined;
+    user?: number | undefined;
+    shareTarget: string;
+    timestamp: number;
+    shareId: string;
+    sourceUser: string;
+    sourceMark: string;
+    enterOpts: {
+      opts: {
+        scene?: number | undefined;
+        chatType?: number | undefined;
+        groupEncryptedData?: string | undefined;
+        groupIv?: string | undefined;
+      };
+      shareId?: string | undefined;
+    };
+  } | undefined;
   private generateShareQuery;
   private getShareEnterOpts;
 }
@@ -804,12 +1530,12 @@ declare function genRandomText(opts?: {
 }): any;
 //#endregion
 //#region src/index.d.ts
-declare const Api_base: Class<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd & ExtShare, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd & typeof ExtShare>;
+declare const Api_base: Class$1<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd & ExtShare, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd & typeof ExtShare>;
 declare class Api extends Api_base {
   constructor(appId: number, base: string, network: Network);
   static createFetch(appId: number, base: string): Api;
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api, Article, MediaAsset as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareTarget, BasicUserInfo as UserInfo, genRandomText };
+export { Api, Article, MediaAsset as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareQuery, type ShareTarget, BasicUserInfo as UserInfo, genRandomText };
 //# sourceMappingURL=index.d.ts.map
