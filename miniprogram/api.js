@@ -2221,6 +2221,9 @@ function isObject$2(value) {
 function isSet$7(value) {
 	return value !== null && value !== void 0;
 }
+//#endregion
+//#region src/compatible/consts.ts
+const kDev = false;
 const allInOnePool = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`;
 function genRandomText(opts) {
 	const { pool = allInOnePool, count = 8 } = opts ?? {};
@@ -7767,6 +7770,6 @@ var Api = class Api extends (0, import_cjs.Mixin)(BaseApi, ApiAuth, ApiReportLog
 	}
 };
 //#endregion
-export { Api, BasicUserInfo as UserInfo, genRandomText, parseTsMedia, parseTsMediaArray };
+export { Api, BasicUserInfo as UserInfo, genRandomText, kDev, parseTsMedia, parseTsMediaArray };
 
 //# sourceMappingURL=index.js.map

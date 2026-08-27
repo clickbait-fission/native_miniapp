@@ -5,10 +5,7 @@ import {BasicTrack} from "./utils/favorite_track";
 
 // app.ts
 App<IAppOption>({
-    // dev
     api: Api.createWx(kAppId, kApiBase),
-    // prod
-    // api: Api.createWx(2, "http://127.0.0.1:6001/api"),
     favorite: new BasicTrack(),
     follow: new BasicTrack(),
     onLaunch(opts) {

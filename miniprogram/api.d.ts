@@ -1585,6 +1585,9 @@ declare function parseTsMediaArray(object: unknown): {
   isFavorite: boolean;
 }[];
 //#endregion
+//#region src/compatible/consts.d.ts
+declare const kDev = false;
+//#endregion
 //#region src/index.d.ts
 declare const Api_base: Class$1<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd & ExtShare, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd & typeof ExtShare>;
 declare class Api extends Api_base {
@@ -1593,5 +1596,5 @@ declare class Api extends Api_base {
   static createWx(appId: number, base: string): Api;
 }
 //#endregion
-export { Api, type Article, type TsMedia as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareQuery, type ShareTarget, BasicUserInfo as UserInfo, genRandomText, parseTsMedia, parseTsMediaArray };
+export { Api, type Article, type TsMedia as Media, type RankName, type ShareItem, type ShareObject, type ShareParam, type ShareQuery, type ShareTarget, BasicUserInfo as UserInfo, genRandomText, kDev, parseTsMedia, parseTsMediaArray };
 //# sourceMappingURL=index.d.ts.map
