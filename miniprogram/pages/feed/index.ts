@@ -1,6 +1,6 @@
 import {IAppOption} from "../../../typings";
 import {Media, parseTsMediaArray, ShareItem, ShareTarget} from "../../api";
-import {kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
+import {fitSdkVersion, kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
 import {computeVars, safeBack, sleep} from "../../utils/util";
 import {skCheckBehavior} from "../../behaviors/sk_behavior";
 import {shareBehavior} from "../../behaviors/share_behavior";
@@ -14,6 +14,12 @@ const kSpanSize = 5;
 const kSpanHalf = (kSpanSize - 1) / 2;
 /** span末尾距已加载数据末尾多近时提前拉取下一页 */
 const kPrefetchCount = 10;
+/** 从3.10开始 direction属性的支持比较完善 **/
+export const kUseDirection = fitSdkVersion("3.10");
+
+if (kDev) {
+    console.log(`feed use direction: ${kUseDirection}`);
+}
 
 function initData(): Media[] {
     return [];
@@ -97,6 +103,28 @@ class RotateSpan {
         return this.dataOffset + kSpanHalf;
     }
 
+    get canMoveNegative(): boolean {
+        return this.span[(this.rotateOffset + 1) % kSpanSize].media != null;
+    }
+
+    get canMovePositive(): boolean {
+        return this.dataOffset > 0;
+    }
+
+    get direction() {
+        if (this.canMovePositive && this.canMoveNegative) {
+            return 'all';
+        }
+        if (this.canMovePositive) {
+            return 'positive';
+        }
+        if (this.canMoveNegative) {
+            return 'negative';
+        }
+        // unreachable
+        return 'all';
+    }
+
     /** 当前数据窗口所处的区域: 顶端 / 中间 / 底端 */
     regionOf(len: number): 'top' | 'middle' | 'bottom' {
         if (len <= kSpanSize || this.dataOffset <= kSpanHalf) {
@@ -110,6 +138,9 @@ class RotateSpan {
 
     /** 只有中间区域需要swiper循环; 顶/底端边界区域关闭circle, 依靠swiper自身边界 */
     circleOf(len: number): boolean {
+        if (kUseDirection) {
+            return true;
+        }
         return len > kSpanSize && this.regionOf(len) === 'middle';
     }
 
@@ -155,7 +186,7 @@ class RotateSpan {
 
     get medias(): MediaInSpan[] {
         // 处理数据不足kSpanSize的情况
-        if (this.dataOffset - this.rotateOffset == 0) {
+        if (!kUseDirection && this.dataOffset - this.rotateOffset == 0) {
             const headPart = [];
             let status: 'head' | 'gap' = 'head';
             for (let i = 0; i < this.span.length; i++) {
@@ -262,6 +293,7 @@ Component({
         vars: '',
         current: 0,
         popContent: '',
+        direction: 'both',
         reportReason: [
             '广告',
             '色情,暴力',
@@ -398,13 +430,19 @@ Component({
             }
             span.move(step);
             span.pickData(this.data._data);
-            // this.sync();
+            if (kUseDirection) {
+                this.sync();
+            }
             this.checkFetchMore();
         },
         onSwiperAnimFinish() {
             this.markSwiperAnimDone();
         },
         markSwiperInAnim() {
+            if (kUseDirection) {
+                return;
+            }
+
             this.data._swiperInAnim = true;
             if (this.data._swiperAnimResetTimer != null) {
                 clearTimeout(this.data._swiperAnimResetTimer);
@@ -414,6 +452,10 @@ Component({
             }, 1000);
         },
         markSwiperAnimDone() {
+            if (kUseDirection) {
+                return;
+            }
+
             this.data._swiperInAnim = false;
             if (this.data._swiperAnimResetTimer != null) {
                 clearTimeout(this.data._swiperAnimResetTimer);
@@ -430,19 +472,23 @@ Component({
             const len = data.length;
 
             // 数据边界对齐: 顶/底端切换为线性布局并关闭circle, 中间保持旋转布局
-            span.reAnchor(len);
+            if (!kUseDirection) {
+                span.reAnchor(len);
+            }
             span.pickData(data);
 
             const isEmpty = !this.data._fetching && this.data._end && len == 0;
             const hasMedias = span.hasMedias;
             const circle = span.circleOf(len);
             const current = span.spanActiveIndex;
+            const direction = span.direction;
 
             let hasUpdate = this.data.medias !== span.span
                 || this.data.hasMedias != hasMedias
                 || this.data.isEmpty != isEmpty
                 || this.data.circle != circle
                 || this.data.current != current
+                || this.data.direction != direction
                 || !span.matchKeys(this.data._keys);
             if (!hasUpdate) {
                 return;
@@ -453,8 +499,9 @@ Component({
                 isEmpty,
                 medias: span.medias,
                 circle,
+                direction,
                 _keys: span.keys,
-                current,
+                // current,
             };
             if (kDev) {
                 console.log('feed.patch', patch);
@@ -494,12 +541,12 @@ Component({
 
                 this.data._data.push(...chunk);
                 this.data._span!.pickData(this.data._data);
-                if (!this.data._swiperInAnim) {
+                if (kUseDirection || !this.data._swiperInAnim) {
                     this.sync();
                 }
             }
             this.data._fetching = false;
-            if (!this.data._swiperInAnim) {
+            if (kUseDirection || !this.data._swiperInAnim) {
                 this.sync();
             }
         },
