@@ -630,9 +630,6 @@ Component({
         onShareAppMessage(event: { from: string }) {
             return this.doShare('message', event.from);
         },
-        onShareTimeline() {
-            return this.doShare('timeline');
-        },
         onAddToFavorites() {
             return this.doShare('favorite');
         },
