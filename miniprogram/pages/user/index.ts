@@ -106,7 +106,6 @@ Component({
                     if (track == null) {
                         try {
                             isFan = await app.api.checkIsFan({
-                                openId: await app.api.authedOpenId(),
                                 upUid: this.properties.uid,
                             });
                         } catch (err) {
@@ -124,7 +123,6 @@ Component({
                 let hot: Media[];
                 try {
                     hot = await app.api.getHot({
-                        openId: await app.api.authedOpenId(),
                         upId: this.properties.uid,
                     });
                 } catch (err) {
@@ -178,7 +176,6 @@ Component({
 
             async function doFanOp(upId: number, op: 'add' | 'remove') {
                 await app.api.followOp({
-                    openId: await app.api.authedOpenId(),
                     upId,
                     op,
                 })

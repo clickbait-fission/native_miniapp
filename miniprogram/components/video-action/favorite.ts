@@ -46,7 +46,6 @@ Component({
             app.favorite.change(this.properties.mediaId, op);
             try {
                 await app.api.favoriteOp({
-                    openId: await app.api.authedOpenId(),
                     mediaId: this.properties.mediaId,
                     op,
                 });

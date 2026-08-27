@@ -107,7 +107,6 @@ Component({
                 let mediaExists: boolean;
                 try {
                     const response = await app.api.shareCheck({
-                        openId: await app.api.authedOpenId(),
                         media: share.media,
                         shareMark: share.sourceMark,
                     });

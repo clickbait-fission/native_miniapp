@@ -489,6 +489,7 @@ declare class BaseSessionManagement {
   protected updateCachedOpenId(openId: string): void;
   readCachedOpenId(): string;
   authedOpenId(): Promise<string>;
+  protected obtainOpenId(openId?: string | null | undefined): Promise<string>;
   protected updateCachedShareMark(shareMark: string): void;
   readCachedShareMark(): string;
   authedShareMark(): Promise<string>;
@@ -545,7 +546,7 @@ declare class ApiReportSessionCorrupt extends BaseApi {
     page: string;
   }): Promise<void> | null;
   reportSessionCorrupt({ openId, expect, actual, page }: {
-    openId: string;
+    openId?: string | null | undefined;
     expect: string;
     actual: string;
     page: string;
@@ -579,30 +580,30 @@ type TextAddRemoveOp = 'add' | 'remove';
 type RankName = 'hot';
 declare class ApiMedia extends BaseApi {
   recommendByRankScore({ openId, topId, excludeId, count, name }: {
-    openId: string;
+    openId?: string | null | undefined;
     topId?: number;
     excludeId?: number;
     count?: number;
     name?: RankName | string;
   }): Promise<MediaAsset[]>;
   favoriteOp({ openId, mediaId, op }: {
-    openId: string;
+    openId?: string | null | undefined;
     mediaId: number;
     op: TextAddRemoveOp;
   }): Promise<void>;
   getFavorite({ openId, cursor, count }: {
-    openId: string;
+    openId?: string | null | undefined;
     cursor?: number;
     count?: number;
   }): Promise<{
     cursor: number;
     media: MediaAsset[];
   }>;
-  createDraft({ openId }: {
-    openId: string;
+  createDraft({ openId }?: {
+    openId?: string | null | undefined;
   }): Promise<number>;
   updateDraft({ openId, draftId, markCoverReady, markVideoReady, markReviewReady, title, drop }: {
-    openId: string;
+    openId?: string | null | undefined;
     draftId: number;
     markCoverReady?: boolean;
     markVideoReady?: boolean;
@@ -611,19 +612,19 @@ declare class ApiMedia extends BaseApi {
     drop?: boolean;
   }): Promise<void>;
   getDraftMeta({ openId, draftId }: {
-    openId: string;
+    openId?: string | null | undefined;
     draftId: number;
   }): Promise<{
     cover: OssPutMeta | undefined;
     video: OssPutMeta | undefined;
   }>;
   listDraft({ openId, cursor, count }: {
-    openId: string;
+    openId?: string | null | undefined;
     cursor?: number;
     count?: number;
   }): Promise<DraftAsset[]>;
-  getArticle({ openId }: {
-    openId: string;
+  getArticle({ openId }?: {
+    openId?: string | null | undefined;
   }): Promise<Article[]>;
 }
 //#endregion
@@ -660,7 +661,7 @@ interface MessageFns$1<T> {
 //#region src/apis/api_user.d.ts
 declare class ApiUser extends BaseApi {
   userUpdateInfo({ openId, nickname, avatar }: {
-    openId: string;
+    openId?: string | null | undefined;
     nickname?: string;
     avatar?: string;
   }): Promise<void>;
@@ -670,44 +671,44 @@ declare class ApiUser extends BaseApi {
     openId: string;
   }): Promise<BasicUserInfo | undefined>;
   followOp({ openId, upId, op }: {
-    openId: string;
+    openId?: string | null | undefined;
     upId: number;
     op: TextAddRemoveOp;
   }): Promise<void>;
   addFollow({ openId, upId }: {
-    openId: string;
+    openId?: string | null | undefined;
     upId: number;
   }): Promise<void>;
   removeFollow({ openId, upId }: {
-    openId: string;
+    openId?: string | null | undefined;
     upId: number;
   }): Promise<void>;
   getHot({ openId, upId }: {
-    openId: string;
+    openId?: string | null | undefined;
     upId: number;
   }): Promise<MediaAsset[]>;
   checkIsFan(props: {
-    openId: string;
+    openId?: string | null | undefined;
   } & ({
     upOpenId: string;
   } | {
     upUid: number;
   })): Promise<boolean>;
   getFollowList({ openId, cursor, count, hotCount }: {
-    openId: string;
+    openId?: string | null | undefined;
     cursor?: number;
     count?: number;
     hotCount?: number;
   }): Promise<GetFollowListItem[]>;
   shareCheck({ openId, media, shareMark }: {
-    openId: string;
+    openId?: string | null | undefined;
     media?: number;
     shareMark?: string | undefined | null;
   }): Promise<{
     mediaExists: boolean;
   }>;
   reportVideo({ openId, mediaId, reason }: {
-    openId: string;
+    openId?: string | null | undefined;
     mediaId: number;
     reason: string;
   }): Promise<void>;
@@ -736,16 +737,16 @@ interface MessageFns<T> {
 //#endregion
 //#region src/apis/api_ad.d.ts
 declare class ApiAd extends BaseApi {
-  getAd({ openId }: {
-    openId: string;
+  getAd({ openId }?: {
+    openId?: string | null | undefined;
   }): Promise<Ad | null>;
   markAdExpose({ openId, adId, historyId }: {
-    openId: string;
+    openId?: string | null | undefined;
     adId: number;
     historyId: number;
   }): Promise<void>;
   markAdConvert({ openId, adId, historyId }: {
-    openId: string;
+    openId?: string | null | undefined;
     adId: number;
     historyId: number;
   }): Promise<void>;

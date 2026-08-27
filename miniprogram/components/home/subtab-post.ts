@@ -19,7 +19,6 @@ Component({
                 itemHeight: 84,
                 fetcher: async () => {
                     const draft = await app.api.listDraft({
-                        openId: await app.api.authedOpenId(),
                         cursor: this.data._cursor ?? undefined,
                         count: 20,
                     });

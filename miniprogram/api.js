@@ -3119,6 +3119,9 @@ var BaseSessionManagement = class {
 		await this.authCheck;
 		return this.cacheOpenId.value;
 	}
+	async obtainOpenId(openId) {
+		return openId ?? await this.authedOpenId();
+	}
 	updateCachedShareMark(shareMark) {
 		this.cacheShareMark.value = shareMark;
 	}
@@ -4855,7 +4858,7 @@ var ApiReportSessionCorrupt = class extends BaseApi {
 			responseMeta: ReportSessionCorruptResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				expect,
 				actual,
 				page
@@ -6889,7 +6892,7 @@ var ApiMedia = class extends BaseApi {
 			path: `/media-hub/recommend/rank/${encodeURIComponent(name)}`,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				count: Math.min(Math.max(count, 1), 10),
 				topId,
 				excludeId
@@ -6909,7 +6912,7 @@ var ApiMedia = class extends BaseApi {
 			responseMeta: CommonResponseData,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				mediaId,
 				op: parseAddRemoveOp(op)
 			},
@@ -6926,7 +6929,7 @@ var ApiMedia = class extends BaseApi {
 			responseMeta: GetFavoriteResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				cursor,
 				count
 			},
@@ -6939,14 +6942,14 @@ var ApiMedia = class extends BaseApi {
 			}
 		});
 	}
-	async createDraft({ openId }) {
+	async createDraft({ openId } = {}) {
 		return this.invokeProtoApi({
 			path: "/media-hub/media/create-draft",
 			requestMeta: CreateDraftRequest,
 			responseMeta: CreateDraftResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId
+				openId: await this.obtainOpenId(openId)
 			},
 			extractor: {
 				commonOf: (response) => response.common,
@@ -6961,7 +6964,7 @@ var ApiMedia = class extends BaseApi {
 			responseMeta: CommonResponseData,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				id: draftId,
 				markCoverReady,
 				markVideoReady,
@@ -6982,7 +6985,7 @@ var ApiMedia = class extends BaseApi {
 			responseMeta: GetDraftMetaResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				id: draftId
 			},
 			extractor: {
@@ -7001,7 +7004,7 @@ var ApiMedia = class extends BaseApi {
 			responseMeta: ListDraftResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				cursor,
 				count
 			},
@@ -7011,14 +7014,14 @@ var ApiMedia = class extends BaseApi {
 			}
 		});
 	}
-	async getArticle({ openId }) {
+	async getArticle({ openId } = {}) {
 		return this.invokeProtoApi({
 			path: "/media-hub/media/get-article",
 			requestMeta: GetArticleRequest,
 			responseMeta: GetArticleResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId
+				openId: await this.obtainOpenId(openId)
 			},
 			extractor: {
 				commonOf: (response) => response.common,
@@ -7035,7 +7038,7 @@ var ApiUser = class extends BaseApi {
 			path: "/media-hub/user/update-info",
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				nickname,
 				avatar
 			},
@@ -7069,7 +7072,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: CommonResponseData,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				upId,
 				op: parseAddRemoveOp(op)
 			},
@@ -7079,16 +7082,16 @@ var ApiUser = class extends BaseApi {
 			}
 		});
 	}
-	addFollow({ openId, upId }) {
+	async addFollow({ openId, upId }) {
 		return this.followOp({
-			openId,
+			openId: await this.obtainOpenId(openId),
 			upId,
 			op: "add"
 		});
 	}
-	removeFollow({ openId, upId }) {
+	async removeFollow({ openId, upId }) {
 		return this.followOp({
-			openId,
+			openId: await this.obtainOpenId(openId),
 			upId,
 			op: "remove"
 		});
@@ -7100,7 +7103,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: GetUserHotResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				upId
 			},
 			extractor: {
@@ -7117,7 +7120,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: CheckIsFanResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				...query
 			},
 			extractor: {
@@ -7133,7 +7136,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: GetFollowListResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				cursor,
 				count,
 				hotCount
@@ -7151,7 +7154,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: ShareCheckResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				mediaId: media,
 				shareMark: shareMark ?? ""
 			},
@@ -7173,7 +7176,7 @@ var ApiUser = class extends BaseApi {
 			responseMeta: CommonResponseData,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				mediaId,
 				reason
 			},
@@ -7571,14 +7574,14 @@ function isSet(value) {
 //#endregion
 //#region src/apis/api_ad.ts
 var ApiAd = class extends BaseApi {
-	async getAd({ openId }) {
+	async getAd({ openId } = {}) {
 		return this.invokeProtoApi({
 			path: "/media-hub/ad/get-ad",
 			requestMeta: ObtainAdRequest,
 			responseMeta: ObtainAdResponse,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId
+				openId: await this.obtainOpenId(openId)
 			},
 			extractor: {
 				commonOf: (response) => response.common,
@@ -7592,7 +7595,7 @@ var ApiAd = class extends BaseApi {
 			requestMeta: MarkAdExposeRequest,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				adId,
 				historyId
 			}
@@ -7604,7 +7607,7 @@ var ApiAd = class extends BaseApi {
 			requestMeta: MarkAdConvertRequest,
 			requestBody: {
 				common: this.obtainCommonApiData(),
-				openId,
+				openId: await this.obtainOpenId(openId),
 				adId,
 				historyId
 			}

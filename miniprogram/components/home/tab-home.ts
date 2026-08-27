@@ -23,9 +23,7 @@ Component({
             this.initDynamicList({
                 itemHeight: this.properties.cardHeight,
                 fetcher: async (currentCount) => {
-                    const openId = await app.api.authedOpenId();
                     return await app.api.recommendByRankScore({
-                        openId: openId,
                         topId: currentCount == 0 && this.properties.hasTop ? this.properties.top : undefined,
                     });
                 },

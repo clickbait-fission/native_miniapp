@@ -369,7 +369,6 @@ Component({
                 this.skCheckOnce(page, share?.media != null);
                 await this.data._skCheckPromise;
                 const {mediaExists} = await app.api.shareCheck({
-                    openId: await app.api.authedOpenId(),
                     shareMark: share?.sourceMark ?? "",
                     media: share?.media ?? undefined,
                 });
@@ -478,7 +477,6 @@ Component({
                         await sleep(2);
                     }
                     chunk = await app.api.recommendByRankScore({
-                        openId: await app.api.authedOpenId(),
                         topId: this.data._data.length == 0 ? (this.data._shareMedia ?? this.properties.top ?? undefined) : undefined,
                     });
                 } catch (err) {
@@ -648,15 +646,6 @@ Component({
             this.doReport(event.detail.value.reason);
         },
         doReport(reason: string) {
-            async function doReport(mediaId: number, reason: string) {
-                const openId = await app.api.authedOpenId();
-                await app.api.reportVideo({
-                    openId,
-                    mediaId,
-                    reason,
-                });
-            }
-
             reason = reason.trim();
             if (reason == '') {
                 wx.showToast({
@@ -668,7 +657,7 @@ Component({
 
             const mediaId = this.data._span?.spanActiveMedia?.id;
             if (mediaId != null) {
-                doReport(mediaId, reason).then(() => {
+                app.api.reportVideo({mediaId, reason}).then(() => {
                     wx.showToast({
                         title: '已提交举报',
                         icon: 'success',

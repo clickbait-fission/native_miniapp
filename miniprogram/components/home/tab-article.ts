@@ -43,9 +43,7 @@ Component({
             while (this.data._active && !this.data.fetched) {
                 let articles: Article[];
                 try {
-                    articles = await app.api.getArticle({
-                        openId: await app.api.authedOpenId(),
-                    });
+                    articles = await app.api.getArticle();
                 } catch (err) {
                     if (kDev) {
                         console.error('article error', err);
