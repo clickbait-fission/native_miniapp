@@ -32,7 +32,6 @@
     <view class="{{hot.length === 0 ? 'empty-hint' : 'videos'}}">
         <scroll-view wx:if="{{hot.length > 0}}" class="hot-grid"
                      scroll-y
-                     type="custom"
                      enhanced="{{true}}"
                      show-scrollbar="{{false}}">
             <view class="grid">

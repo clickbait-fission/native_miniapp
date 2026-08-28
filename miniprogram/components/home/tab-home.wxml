@@ -2,7 +2,6 @@
         class="container"
         style="{{dynamicStyle}}"
         scroll-y
-        type="custom"
         enhanced="{{true}}"
         show-scrollbar="{{false}}"
         bind:scroll="onScroll">

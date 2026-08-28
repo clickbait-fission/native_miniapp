@@ -8,7 +8,6 @@
         wx:if="{{!fetching && fetched && articles.length > 0}}"
         class="container"
         scroll-y
-        type="custom"
         enhanced="{{true}}"
         show-scrollbar="{{false}}">
     <view wx:for="{{articles}}" wx:key="key" class="article" bind:tap="onTapArticle" data-url="{{item.address}}">

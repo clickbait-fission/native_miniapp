@@ -1,4 +1,4 @@
-<scroll-view type="custom" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+<scroll-view scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
     <view class="license">
         <view class="p">
             本小程序（以下简称“我们”）高度重视用户的个人信息和隐私保护。在您使用本小程序服务过程中，我们将严格依据相关法律法规要求，采取相应措施保护您的个人信息安全。
