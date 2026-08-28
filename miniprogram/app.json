@@ -16,6 +16,7 @@
   },
   "resizable": true,
   "style": "v2",
+  "renderer": "webview",
   "rendererOptions": {
     "skyline": {
       "defaultDisplayBlock": true,

@@ -1,5 +1,6 @@
 {
   "navigationStyle": "default",
   "navigationBarTitleText": "用户使用协议",
+  "renderer": "webview",
   "usingComponents": {}
 }

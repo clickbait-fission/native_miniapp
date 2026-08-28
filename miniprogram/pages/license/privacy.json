@@ -1,5 +1,6 @@
 {
   "navigationStyle": "default",
   "navigationBarTitleText": "隐私协议",
+  "renderer": "webview",
   "usingComponents": {}
 }
