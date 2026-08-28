@@ -71,7 +71,6 @@ Component({
         },
         changeTab(event: WechatMiniprogram.BaseEvent) {
             const tab = event.currentTarget.dataset.tab;
-            console.log('fuck', event, tab);
 
             const newTabs = [];
             for (const tabConfig of this.data.tabs) {
