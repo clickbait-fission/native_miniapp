@@ -1586,7 +1586,7 @@ declare function parseTsMediaArray(object: unknown): {
 }[];
 //#endregion
 //#region src/compatible/consts.d.ts
-declare const kDev = false;
+declare const kDev: boolean;
 //#endregion
 //#region src/index.d.ts
 declare const Api_base: Class$1<any[], BaseApi & ApiAuth & ApiReportLog & ApiReportSessionCorrupt & ApiMedia & ApiUser & ApiAd & ExtShare, typeof BaseApi & typeof ApiAuth & typeof ApiReportLog & typeof ApiReportSessionCorrupt & typeof ApiMedia & typeof ApiUser & typeof ApiAd & typeof ExtShare>;
