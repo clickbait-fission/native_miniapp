@@ -287,6 +287,7 @@ Component({
         _swiperAnimResetTimer: typedNull<number>(),
         _favoriteObserve: typedNull<() => void>(),
         _videoTapTrack: typedNull<TapTrack<string>>(),
+        _shareHintDismissTimer: typedNull<number>(),
         autoplay: true,
         muted: kDev,
         circle: false,
@@ -588,18 +589,36 @@ Component({
                 ctx.play();
             }
         },
-        async onDoubleTapVideo() {
+        onDoubleTapVideo() {
             if (this.data.showShareHint) {
                 return;
             }
 
+            if (this.data._shareHintDismissTimer != null) {
+                clearTimeout(this.data._shareHintDismissTimer);
+            }
+            this.data._shareHintDismissTimer = setTimeout(() => {
+                this.data._shareHintDismissTimer = null;
+                if (this.data.showShareHint) {
+                    this.setData({
+                        showShareHint: false,
+                    });
+                }
+            }, 5000);
             this.setData({
                 showShareHint: true,
             });
-            await sleep(3);
-            this.setData({
-                showShareHint: false,
-            });
+        },
+        onTapShareHint() {
+            if (this.data._shareHintDismissTimer != null) {
+                clearTimeout(this.data._shareHintDismissTimer);
+                this.data._shareHintDismissTimer = null;
+            }
+            if (this.data.showShareHint) {
+                this.setData({
+                    showShareHint: false,
+                });
+            }
         },
         onVideoPlay(event: WechatMiniprogram.BaseEvent) {
             const id = event.currentTarget.dataset.id as string;

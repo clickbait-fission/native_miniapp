@@ -51,7 +51,8 @@
         </swiper-item>
     </swiper>
 
-    <view wx:if="{{true}}" class="share-hint">
+    <view wx:if="{{showShareHint}}" class="share-hint" bind:tap="onTapShareHint">
+        <view class="hint-splash" />
         <image class="hint-icon" mode="aspectFit" src="/assets/like-hint-icon.svg" />
         <text class="share-text">
             快把点赞的视频分享给群友吧!

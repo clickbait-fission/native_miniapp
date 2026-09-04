@@ -1,6 +1,89 @@
 $more_tap_extend_left: 12px;
 $more_tap_extend_right: 12px;
 
+// ================= 双击点赞分享提醒(share-hint)动画参数 =================
+// share-hint 由 wx:if 挂载, 动画只在挂载那一刻播放一遍:
+//   t = 0s ~ 0.3s         .hint-splash   扩散圆环: 大小由0%扩到100%, 随后淡出隐藏
+//   t = 0s ~ 图标动画结束 .hint-icon     点赞手势: 淡入放大与逆时针甩动回正并行, 完全展示后停留再淡出
+//   t = 图标动画结束起    .share-text / .share-button  分享引导(一行文字+按钮)直接显示并常驻
+//   (图标动画结束 = $hint-icon-duration, 分享引导出现时刻 = $hint-content-show-delay)
+$hint-splash-duration: 0.15s;      // 圆环动画总时长
+$hint-splash-fade-from: 30%;      // 圆环扩散到100%后开始淡出的时刻(剩余时间淡出隐藏)
+$hint-icon-duration: 0.7s;        // 手势动画总时长(结束时刻 = 分享引导出现)
+$hint-icon-scale-from: 0.5;       // 手势起始大小比例(50%)
+$hint-icon-show-end: 45%;         // 手势弹出(淡入+放大+回正)完成的时刻(此后停留展示)
+$hint-icon-hide-start: 80%;       // 手势开始淡出的时刻(45%~80%间停留展示)
+$hint-icon-rotate: -50deg;        // 逆时针甩动角度(顺时针为正, 故逆时针取负)
+// 甩动与淡入/放大并行发生: 弹出过程中一边淡入放大一边逆时针甩出, 到峰值后回正,
+// 回正与"完全展示"(show-end)同时完成; 峰值位置按弹出段比例自适应:
+$hint-icon-rotate-peak-at: 0.6;   // 甩动峰值在弹出段内的位置比例(0~1, 默认0.6 → 约27%总时长处)
+$hint-icon-rotate-peak: $hint-icon-show-end * $hint-icon-rotate-peak-at;   // 逆时针甩到最大的时刻(默认27%)
+$hint-icon-peak-opacity: $hint-icon-rotate-peak-at;                       // 峰值帧透明度(与淡入线性一致, 默认0.6)
+$hint-icon-peak-scale: $hint-icon-scale-from + (1 - $hint-icon-scale-from) * $hint-icon-rotate-peak-at; // 峰值帧缩放(与放大线性一致, 默认0.8)
+$hint-icon-ease-in: cubic-bezier(0.22, 0.61, 0.36, 1); // 弹出段缓动曲线(0% → 甩动峰值)
+$hint-content-show-delay: $hint-icon-duration;   // 分享引导出现延迟(= 手势消失时刻)
+$hint-content-show-duration: 0.01s;              // 分享引导"切换可见性"的动画时长(≈0, 即瞬时)
+
+// 圆环扩散: 大小从0%到100%, 之后淡出隐藏
+@keyframes hint-splash-pop {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0);
+    animation-timing-function: ease-out;
+  }
+  #{$hint-splash-fade-from} {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    animation-timing-function: linear;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+// 手势弹出: 淡入 + 放大 + 逆时针甩动三者并行(边出现边甩出再回正), 完全展示后停留再淡出
+@keyframes hint-icon-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(#{$hint-icon-scale-from}) rotate(0deg);
+    animation-timing-function: $hint-icon-ease-in;
+  }
+  // 甩动峰值: 逆时针甩到最大角度(此时仍在淡入/放大途中)
+  #{$hint-icon-rotate-peak} {
+    opacity: $hint-icon-peak-opacity;
+    transform: translate(-50%, -50%) scale(#{$hint-icon-peak-scale}) rotate(#{$hint-icon-rotate});
+    animation-timing-function: linear;
+  }
+  // 完全展示: 淡入/放大完成, 同时回正到0°
+  #{$hint-icon-show-end} {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    animation-timing-function: linear;
+  }
+  #{$hint-icon-hide-start} {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+}
+
+// 分享引导出现: 从隐藏直接切换为可见(不做入场动画)
+@keyframes hint-content-show {
+  0% {
+    opacity: 0;
+    visibility: hidden;
+  }
+  100% {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
 .container {
   position: relative;
   width: 100%;
@@ -25,6 +108,24 @@ $more_tap_extend_right: 12px;
 
     background: rgba(black, 0.6);
 
+    .hint-splash {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 72px;
+      height: 72px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border-width: 8px;
+      border-style: solid;
+      border-color: rgba(purple, 0.6);
+
+      // 装饰性动画层, 不参与点击
+      pointer-events: none;
+      // 扩散圆环: 大小从0%到100%后淡出, 整体播一遍
+      animation: hint-splash-pop $hint-splash-duration linear both;
+    }
+
     .hint-icon {
       position: absolute;
       left: 50%;
@@ -32,6 +133,11 @@ $more_tap_extend_right: 12px;
       width: 64px;
       height: 64px;
       transform: translate(-50%, -50%);
+
+      // 装饰性动画层, 不参与点击
+      pointer-events: none;
+      // 点赞手势: 淡入放大同时逆时针甩动回正, 停留后淡出
+      animation: hint-icon-pop $hint-icon-duration linear both;
     }
 
     .share-text {
@@ -70,6 +176,14 @@ $more_tap_extend_right: 12px;
         height: 40px;
         margin-right: 8px;
       }
+    }
+
+    // 分享引导(文字+按钮): 等手势动画结束($hint-content-show-delay)后直接显示并常驻
+    .share-text,
+    .share-button {
+      opacity: 0;
+      visibility: hidden;
+      animation: hint-content-show $hint-content-show-duration linear $hint-content-show-delay both;
     }
   }
 
