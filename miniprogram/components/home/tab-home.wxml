@@ -7,7 +7,7 @@
         bind:scroll="onScroll">
     <view class="root">
         <view class="top-space"/>
-        <view wx:for="{{shown}}" wx:key="key" class="card">
+        <view wx:for="{{shown}}" wx:key="id" class="card">
             <media-brief media="{{item}}"/>
         </view>
         <view class="bottom-space"/>

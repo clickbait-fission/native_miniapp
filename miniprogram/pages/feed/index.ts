@@ -224,7 +224,7 @@ class RotateSpan {
         }
 
         for (let i = 0; i < kSpanSize; i++) {
-            if (this.span[i].index !== keys[i]) {
+            if (this.span[i].media?.id !== keys[i]) {
                 return false;
             }
         }
@@ -297,6 +297,7 @@ Component({
         _favoriteObserve: typedNull<() => void>(),
         _videoTapTrack: typedNull<TapTrack<VideoTapId>>(),
         _shareHintDismissTimer: typedNull<number>(),
+        _reportTrack: typedNull<() => void>(),
         autoplay: true,
         muted: kDev,
         circle: false,
@@ -346,6 +347,7 @@ Component({
                 popContent: '',
             });
             this.shareCheck();
+            this.reportCheck(true);
             this.checkFetchMore();
             this.sync();
             this.data._favoriteObserve = app.favorite.observe(() => {
@@ -353,12 +355,19 @@ Component({
                     this.sync();
                 }
             });
+            this.data._reportTrack = app.reported.observe(() => {
+                this.reportCheck();
+            });
         },
         detached() {
             this.data._active = false;
             if (this.data._favoriteObserve != null) {
-                this.data._favoriteObserve!();
+                this.data._favoriteObserve();
                 this.data._favoriteObserve = null;
+            }
+            if (this.data._reportTrack != null) {
+                this.data._reportTrack();
+                this.data._reportTrack = null;
             }
             this.data._videoTapTrack!.reset();
         },
@@ -447,6 +456,19 @@ Component({
                     console.error('share check error', err);
                 }
             });
+        },
+        reportCheck(skipSync?: boolean) {
+            let hasUpdate = false;
+            for (let i = this.data._data.length - 1; i >= 0; i--) {
+                if (app.reported.state.indexOf(this.data._data[i].id) < 0) {
+                    continue;
+                }
+                hasUpdate = true;
+                this.data._data.splice(i, 1);
+            }
+            if (hasUpdate && skipSync !== true && (kUseDirection || !this.data._swiperInAnim)) {
+                this.sync();
+            }
         },
         onSwiperChange(event: WechatMiniprogram.SwiperChange) {
             this.markSwiperInAnim();
@@ -819,6 +841,11 @@ Component({
             const mediaId = this.data._span?.spanActiveMedia?.id;
             if (mediaId != null) {
                 app.api.reportVideo({mediaId, reason}).then(() => {
+                    app.reported.modify((current) => {
+                        return current.indexOf(mediaId) >= 0
+                            ? current
+                            : [...current, mediaId];
+                    });
                     wx.showToast({
                         title: '已提交举报',
                         icon: 'success',
@@ -828,7 +855,7 @@ Component({
                         console.error('report video', err);
                     }
                     wx.showToast({
-                        title: '已提交失败,请稍后重试',
+                        title: '提交失败,请稍后重试',
                         icon: 'success',
                     });
                 });
