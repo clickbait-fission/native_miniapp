@@ -378,14 +378,9 @@ interface ShareVideo {
   miniAppFrom?: string | undefined;
   shareTarget: string;
 }
-interface ReportMedia {
-  mediaId: number;
-  reason: string;
-}
 declare const OpenApp: MessageFns$4<OpenApp>;
 declare const OpenPage: MessageFns$4<OpenPage>;
 declare const ShareVideo: MessageFns$4<ShareVideo>;
-declare const ReportMedia: MessageFns$4<ReportMedia>;
 type Builtin$4 = Date | Function | Uint8Array | string | number | boolean | undefined;
 type DeepPartial$4<T> = T extends Builtin$4 ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial$4<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial$4<U>> : T extends {} ? { [K in keyof T]?: DeepPartial$4<T[K]>; } : Partial<T>;
 type KeysOfUnion$4<T> = T extends T ? keyof T : never;
@@ -430,7 +425,6 @@ interface CombinedLog {
   videoView?: VideoView | undefined;
   videoViewFinish?: VideoViewFinish | undefined;
   shareVideo?: ShareVideo | undefined;
-  reportMedia?: ReportMedia | undefined;
 }
 interface BaseLogInfo {
   openId: string;
@@ -711,6 +705,10 @@ declare class ApiUser extends BaseApi {
     openId?: string | null | undefined;
     mediaId: number;
     reason: string;
+  }): Promise<void>;
+  likeVideo({ openId, mediaId }: {
+    openId?: string | null | undefined;
+    mediaId: number;
   }): Promise<void>;
 }
 //#endregion

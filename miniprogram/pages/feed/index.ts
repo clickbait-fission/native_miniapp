@@ -6,6 +6,15 @@ import {skCheckBehavior} from "../../behaviors/sk_behavior";
 import {shareBehavior} from "../../behaviors/share_behavior";
 import {TapTrack} from "../../utils/tap_track";
 
+type VideoTapId = {
+    spanItemId: string;
+    mediaId: number;
+};
+
+function videoTapIdEq(a: VideoTapId, b: VideoTapId) {
+    return a.spanItemId == b.spanItemId;
+}
+
 const app = getApp<IAppOption>();
 const page = '/feed';
 
@@ -286,7 +295,7 @@ Component({
         _swiperInAnim: false,
         _swiperAnimResetTimer: typedNull<number>(),
         _favoriteObserve: typedNull<() => void>(),
-        _videoTapTrack: typedNull<TapTrack<string>>(),
+        _videoTapTrack: typedNull<TapTrack<VideoTapId>>(),
         _shareHintDismissTimer: typedNull<number>(),
         autoplay: true,
         muted: kDev,
@@ -318,12 +327,13 @@ Component({
         created() {
             this.data._span = new RotateSpan();
             this.data._data = initData();
-            this.data._videoTapTrack = new TapTrack<string>({
+            this.data._videoTapTrack = new TapTrack<VideoTapId>({
+                tapContentEq: videoTapIdEq,
                 onTap: (id) => {
                     this.onSingleTapVideo(id);
                 },
-                onDoubleTap: () => {
-                    this.onDoubleTapVideo();
+                onDoubleTap: (id) => {
+                    this.onDoubleTapVideo(id);
                 },
             })
         },
@@ -579,20 +589,30 @@ Component({
         },
         onTapVideo(event: WechatMiniprogram.BaseEvent) {
             const id = event.currentTarget.dataset.id as string;
-            this.data._videoTapTrack!.onTap(id);
+            const mediaId = this.data._span!.spanActiveMedia?.id;
+            if (mediaId == null) {
+                return;
+            }
+
+            this.data._videoTapTrack!.onTap({
+                spanItemId: id,
+                mediaId,
+            });
         },
-        onSingleTapVideo(id: string) {
-            const ctx = wx.createVideoContext(id);
-            if (this.data._playingId == id) {
+        onSingleTapVideo({spanItemId}: VideoTapId) {
+            const ctx = wx.createVideoContext(spanItemId);
+            if (this.data._playingId == spanItemId) {
                 ctx.pause();
             } else {
                 ctx.play();
             }
         },
-        onDoubleTapVideo() {
+        onDoubleTapVideo({mediaId}: VideoTapId) {
             if (this.data.showShareHint) {
                 return;
             }
+
+            app.api.likeVideo({mediaId});
 
             if (this.data._shareHintDismissTimer != null) {
                 clearTimeout(this.data._shareHintDismissTimer);
