@@ -87,7 +87,7 @@
 
         <view wx:if="{{popContent === 'report'}}" class="popup report">
             <view wx:for="{{reportReason}}" class="cell reason" data-reason="{{item}}" bind:tap="onTapReportConfirm">
-                {{item}}
+                <text>{{item}}</text>
             </view>
             <view class="cell reason other" bind:tap="onTapReportCustom">
                 <text class="text">其他原因</text>
