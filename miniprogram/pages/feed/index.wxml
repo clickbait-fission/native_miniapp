@@ -50,6 +50,18 @@
             </view>
         </swiper-item>
     </swiper>
+
+    <view wx:if="{{true}}" class="share-hint">
+        <image class="hint-icon" mode="aspectFit" src="/assets/like-hint-icon.svg" />
+        <text class="share-text">
+            快把点赞的视频分享给群友吧!
+        </text>
+        <button class="share-button" open-type="share">
+            <image class="wechat" mode="aspectFit" src="/assets/wechat.png" />
+            <text>分享给群友</text>
+        </button>
+    </view>
+
     <image class="back" bind:tap="onTapBack" src="/assets/back.svg" mode="aspectFit"/>
 
     <page-container show="{{popContent !== ''}}" position="bottom" bind:afterleave="onMoreLeave">

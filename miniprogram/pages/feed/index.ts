@@ -1,9 +1,10 @@
 import {IAppOption} from "../../../typings";
 import {Media, parseTsMediaArray, ShareItem, ShareTarget} from "../../api";
 import {fitSdkVersion, kDev, kHome, kShareImage, kShareTitle} from "../../utils/consts";
-import {computeVars, safeBack, sleep} from "../../utils/util";
+import {computeVars, safeBack, sleep, typedNull} from "../../utils/util";
 import {skCheckBehavior} from "../../behaviors/sk_behavior";
 import {shareBehavior} from "../../behaviors/share_behavior";
+import {TapTrack} from "../../utils/tap_track";
 
 const app = getApp<IAppOption>();
 const page = '/feed';
@@ -273,9 +274,9 @@ Component({
         _active: false,
         _inputCheck: false,
         _shareChecked: false,
-        _shareCheckPromise: null as Promise<void> | null,
-        _shareMedia: undefined as number | undefined,
-        _span: null as RotateSpan | null,
+        _shareCheckPromise: typedNull<Promise<void>>(),
+        _shareMedia: typedNull<number>(),
+        _span: typedNull<RotateSpan>(),
         _data: initData(),
         _fetching: false,
         _end: false,
@@ -283,13 +284,14 @@ Component({
         _playingId: '',
         _finishReported: false,
         _swiperInAnim: false,
-        _swiperAnimResetTimer: null as number | null,
-        _favoriteObserve: null as (() => void) | null,
+        _swiperAnimResetTimer: typedNull<number>(),
+        _favoriteObserve: typedNull<() => void>(),
+        _videoTapTrack: typedNull<TapTrack<string>>(),
         autoplay: true,
         muted: kDev,
         circle: false,
         hasMedias: false,
-        medias: null as MediaInSpan[] | null,
+        medias: typedNull<MediaInSpan[]>(),
         isEmpty: false,
         vars: '',
         current: 0,
@@ -309,11 +311,20 @@ Component({
             '清晰度差',
             '暂停,快进,全屏等操作无响应',
         ],
+        showShareHint: false,
     },
     lifetimes: {
         created() {
             this.data._span = new RotateSpan();
             this.data._data = initData();
+            this.data._videoTapTrack = new TapTrack<string>({
+                onTap: (id) => {
+                    this.onSingleTapVideo(id);
+                },
+                onDoubleTap: () => {
+                    this.onDoubleTapVideo();
+                },
+            })
         },
         attached() {
             this.data._active = true;
@@ -338,6 +349,7 @@ Component({
                 this.data._favoriteObserve!();
                 this.data._favoriteObserve = null;
             }
+            this.data._videoTapTrack!.reset();
         },
     },
     pageLifetimes: {
@@ -416,7 +428,7 @@ Component({
                     media: share?.media ?? undefined,
                 });
                 if (mediaExists) {
-                    this.data._shareMedia = share?.media;
+                    this.data._shareMedia = share?.media ?? null;
                 }
             };
             this.data._shareCheckPromise = doShareCheck().catch((err) => {
@@ -566,12 +578,28 @@ Component({
         },
         onTapVideo(event: WechatMiniprogram.BaseEvent) {
             const id = event.currentTarget.dataset.id as string;
+            this.data._videoTapTrack!.onTap(id);
+        },
+        onSingleTapVideo(id: string) {
             const ctx = wx.createVideoContext(id);
             if (this.data._playingId == id) {
                 ctx.pause();
             } else {
                 ctx.play();
             }
+        },
+        async onDoubleTapVideo() {
+            if (this.data.showShareHint) {
+                return;
+            }
+
+            this.setData({
+                showShareHint: true,
+            });
+            await sleep(3);
+            this.setData({
+                showShareHint: false,
+            });
         },
         onVideoPlay(event: WechatMiniprogram.BaseEvent) {
             const id = event.currentTarget.dataset.id as string;

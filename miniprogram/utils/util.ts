@@ -20,3 +20,7 @@ export function safeBack() {
         wx.navigateBack();
     }
 }
+
+export function typedNull<T>(): T | null {
+    return null;
+}
