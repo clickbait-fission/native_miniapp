@@ -284,6 +284,7 @@ Component({
         _finishReported: false,
         _swiperInAnim: false,
         _swiperAnimResetTimer: null as number | null,
+        _favoriteObserve: null as (() => void) | null,
         autoplay: true,
         muted: kDev,
         circle: false,
@@ -294,6 +295,7 @@ Component({
         current: 0,
         popContent: '',
         direction: 'both',
+        isFavorite: false,
         reportReason: [
             '广告',
             '色情,暴力',
@@ -324,9 +326,18 @@ Component({
             this.shareCheck();
             this.checkFetchMore();
             this.sync();
+            this.data._favoriteObserve = app.favorite.observe(() => {
+                if (kUseDirection || !this.data._swiperInAnim) {
+                    this.sync();
+                }
+            });
         },
         detached() {
             this.data._active = false;
+            if (this.data._favoriteObserve != null) {
+                this.data._favoriteObserve!();
+                this.data._favoriteObserve = null;
+            }
         },
     },
     pageLifetimes: {
@@ -480,8 +491,9 @@ Component({
             const isEmpty = !this.data._fetching && this.data._end && len == 0;
             const hasMedias = span.hasMedias;
             const circle = span.circleOf(len);
-            const current = span.spanActiveIndex;
+            const current = kUseDirection ? 0 : span.spanActiveIndex;
             const direction = span.direction;
+            const isFavorite = app.favorite.optCheck(span.spanActiveMedia?.id) ?? span.spanActiveMedia?.isFavorite ?? false;
 
             let hasUpdate = this.data.medias !== span.span
                 || this.data.hasMedias != hasMedias
@@ -489,6 +501,7 @@ Component({
                 || this.data.circle != circle
                 || this.data.current != current
                 || this.data.direction != direction
+                || this.data.isFavorite != isFavorite
                 || !span.matchKeys(this.data._keys);
             if (!hasUpdate) {
                 return;
@@ -501,7 +514,8 @@ Component({
                 circle,
                 direction,
                 _keys: span.keys,
-                // current,
+                current,
+                isFavorite,
             };
             if (kDev) {
                 console.log('feed.patch', patch);
@@ -668,6 +682,42 @@ Component({
         onMoreLeave() {
             this.setData({
                 popContent: '',
+            });
+        },
+        onTapFavorite() {
+            const media = this.data._span?.spanActiveMedia;
+            if (media == null) {
+                return;
+            }
+
+            const op = this.data.isFavorite ? 'remove' : 'add';
+            const revOp = this.data.isFavorite ? 'add' : 'remove';
+            const opName = this.data.isFavorite ? '取消收藏' : '收藏';
+
+            this.setData({
+                popContent: '',
+            });
+
+            app.favorite.change(media.id, op);
+            app.api.favoriteOp({
+                mediaId: media.id,
+                op,
+            }).then(() => {
+                wx.showToast({
+                    title: `${opName}成功`,
+                    icon: 'success',
+                    duration: 700,
+                });
+            }).catch((err) => {
+                if (kDev) {
+                    console.error('favorite api', err);
+                }
+                wx.showToast({
+                    title: `${opName}失败`,
+                    icon: 'error',
+                    duration: 100,
+                });
+                app.favorite.change(media.id, revOp);
             });
         },
         onTapReport() {

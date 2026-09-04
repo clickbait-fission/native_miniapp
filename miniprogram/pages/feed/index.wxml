@@ -35,9 +35,6 @@
                        data-media-id="{{item.media.id}}"/>
                 <view class="actions">
                     <image class="more" mode="aspectFit" src="/assets/ellipsis-vertical.svg" bind:tap="onTapMore"/>
-                    <view class="favorite">
-                        <action-favorite mediaId="{{item.media.id}}" isFavorite="{{item.media.isFavorite}}"/>
-                    </view>
                     <view class="gap"/>
                     <view class="share">
                         <action-share mediaId="{{item.media.id}}" target="group"/>
@@ -63,6 +60,14 @@
             <view class="cell" bind:tap="onTapReport">
                 <view class="text">
                     <text>举报</text>
+                </view>
+            </view>
+            <view class="cell" bind:tap="onTapFavorite">
+                <image class="icon" mode="aspectFit" src="/assets/heart-{{isFavorite ? 'minus' : 'plus'}}.svg"/>
+            </view>
+            <view class="cell" bind:tap="onTapFavorite">
+                <view class="text">
+                    <text>{{isFavorite ? '取消收藏' : '收藏'}}</text>
                 </view>
             </view>
         </view>

@@ -42,7 +42,10 @@ export class BasicTrack {
         return id in this.overrides;
     }
 
-    optCheck(id: number): boolean | undefined {
+    optCheck(id?: number): boolean | undefined {
+        if (id == null) {
+            return undefined;
+        }
         if (id in this.overrides) {
             switch (this.overrides[id]) {
                 case 'add':
